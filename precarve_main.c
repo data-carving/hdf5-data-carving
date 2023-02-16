@@ -75,7 +75,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		data_space = H5Dget_space(dset_id);
 		hid_t create_plist = H5Dget_create_plist(dset_id);	
 
-		if (strcmp(name, "axis0") || strcmp(name, "axis1") || strcmp(name, "block0_items")) {
+		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
 			printf("COPY HIT\n");
 			herr_t is_success = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
 
