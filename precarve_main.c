@@ -39,6 +39,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 	// printf("Creating attribute: %s\n", name_of_attribute);
 	H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
 
+	H5Aclose(src_attribute_id);
 	free(name_of_attribute);
 	return 0;
 }
@@ -90,6 +91,8 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 
 			H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dset_id); // Iterate through each attribute and create a copy
 		}
+
+		H5Dclose(dset_id);
 	// If object is a group, recursively make shallow copy of the group
 	} else if (object_type == H5I_GROUP) {
 		printf("Creating shallow copy of group %s\n", name);
@@ -111,6 +114,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_group_id); // Iterate through each attribute and create a copy
 	}
 	
+	H5Oclose(object_id);
 	return 0;
 }
 
@@ -124,6 +128,8 @@ void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *li
 
 	// Sum
 	num_of_datasets_and_groups += count;
+
+	H5Oclose(group_id);
 }
 
 hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
@@ -151,6 +157,9 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	H5Literate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_g_loc_id); // Iterate through each object and create shallow copy
 	H5Aiterate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_g_loc_id); // Iterate through each object and create shallow copy
 	
+	H5Gclose(g_loc_id);
+	H5Gclose(dest_g_loc_id);
+	free(datasets_groups_accessed);
 	return src_file_id;
 }
 
@@ -191,6 +200,7 @@ herr_t H5Dread(hid_t dset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_
     			printf("Copying %s failed.\n", dataset_name);
     		}
 
+    		H5Dclose(destination_dset_id);
     		break;
     	}
     }
@@ -199,5 +209,6 @@ herr_t H5Dread(hid_t dset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_
 	orig_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
 	herr_t return_val = orig_H5Dread(dset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
 	
+
 	return return_val;
 }
