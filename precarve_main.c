@@ -23,7 +23,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return -1;
 	}
 
-	// Open the object
+	// Open the attribute
 	hid_t src_attribute_id = H5Aopen(loc_id, name, H5P_DEFAULT);
 
 	if (src_attribute_id < 0) {
@@ -31,6 +31,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return src_attribute_id ;
 	}
 
+	// Fetch length of name of attribute
 	int size_of_name_buffer = H5Aget_name(src_attribute_id, NULL, 0) + 1;
 
 	if (size_of_name_buffer < 0) {
@@ -38,8 +39,11 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return size_of_name_buffer;
 	}
 
+	// Create and populate buffer for attribute name
 	char *name_of_attribute = (char *)malloc(size_of_name_buffer);
 	H5Aget_name(src_attribute_id, size_of_name_buffer, name_of_attribute);
+
+	// Fetch data type of attribute
 	attribute_data_type = H5Aget_type(src_attribute_id);
 
 	if (attribute_data_type == H5I_INVALID_HID) {
@@ -47,6 +51,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return attribute_data_type;
 	}
 
+	// Fetch data space of attribute
 	attribute_data_space = H5Aget_space(src_attribute_id);
 
 	if (attribute_data_space < 0) {
@@ -54,8 +59,10 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return attribute_data_space;
 	}
 
+	// Fetch data size of attribute
 	hsize_t attribute_data_size = H5Aget_storage_size(src_attribute_id);
 
+	// Create and populate buffer for attribute data
 	void* attribute_data_buffer = malloc(attribute_data_size);
 	herr_t read_return_val = H5Aread(src_attribute_id, attribute_data_type, attribute_data_buffer);
 
@@ -64,6 +71,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return read_return_val;
 	}
 
+	// Create attribute in destination file
 	dest_attribute_id = H5Acreate1(*dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
 	
 	if (dest_attribute_id < 0) {
@@ -71,6 +79,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return dest_attribute_id;
 	}
 
+	// Write attribute data to the newly created attribute in destination file
 	herr_t write_return_val = H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
 
 	if (write_return_val < 0) {
@@ -93,6 +102,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		return object_id;
 	}
 
+	// Fetch id of parent object
 	hid_t *dest_parent_object_id = (hid_t *)opdata;
 	
 	if (dest_parent_object_id == NULL) {
@@ -108,6 +118,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		return object_type;
 	}
 
+	// Fetch length of name of object
 	int size_of_name_buffer = H5Iget_name(object_id, NULL, 0) + 1; // Preliminary call to fetch length of object name
 
 	if (size_of_name_buffer == 0) {
@@ -115,12 +126,15 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		return -1;
 	}
 
+	// Create and populate buffer for name of object
     const char *object_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
-	// If object is a dataset, make shallow copy
+	// If object is a dataset, make shallow copy of dataset and terminate
 	if (object_type == H5I_DATASET) {
 		hid_t dataset_id, data_type, data_space;
+
+		// Open the dataset
 		dataset_id = H5Dopen(src_file_id, object_name, H5P_DEFAULT);
 
 		if (dataset_id == H5I_INVALID_HID) {
@@ -128,6 +142,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return dataset_id;
 		}
 
+		// Fetch data type of dataset
 		data_type = H5Dget_type(dataset_id);
 
 		if (data_type == H5I_INVALID_HID) {
@@ -135,6 +150,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return data_type;
 		}
 
+		// Fetch data space of dataset
 		data_space = H5Dget_space(dataset_id);
 
 		if (data_space == H5I_INVALID_HID) {
@@ -142,6 +158,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return data_space;
 		}
 
+		// Fetch dataset creation property list identifier of dataset in source file
 		hid_t dataset_creation_property_list_id = H5Dget_create_plist(dataset_id);
 
 		if (dataset_creation_property_list_id == H5I_INVALID_HID) {
@@ -149,6 +166,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return dataset_creation_property_list_id;
 		}
 
+		// If dataset is "axis0", "axis1", or "block0_items", make deep copy
 		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
 			herr_t object_copy_return_val = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -156,7 +174,9 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	    		printf("Copying %s failed in shallow_copy_object.\n", object_name);
 	    		return object_copy_return_val;
 	    	}
+	    // Otherwise, make shallow copy of the dataset
 		} else {
+			// Create dataset in destination file
 			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
 			if (dest_dataset_id < 0) {
@@ -164,6 +184,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 				return dest_dataset_id;
 			}
 
+			// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
 			herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dataset_id); // Iterate through each attribute and create a copy
 
 			if (attribute_iterate_return_val < 0) {
@@ -171,8 +192,9 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 				return attribute_iterate_return_val;
 			}
 		}
-	// If object is a group, recursively make shallow copy of the group
+	// If object is a group, make shallow copy of the group and recursively go down the tree
 	} else if (object_type == H5I_GROUP) {
+		// Create group in destination file
 		hid_t dest_group_id = H5Gcreate1(*dest_parent_object_id, name, size_of_name_buffer);
 
 		if (dest_group_id < 0) {
@@ -180,6 +202,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return dest_group_id;
 		}
 
+		// Iterate over objects at this level in the source file, and make shallow copes in the destination file
 		herr_t link_iterate_return_val = H5Literate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_group_id);
 
 		if (link_iterate_return_val < 0) {
@@ -187,6 +210,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return link_iterate_return_val;
 		}
 
+		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
 		herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_group_id); // Iterate through each attribute and create a copy
 		
 		if (attribute_iterate_return_val < 0) {
@@ -207,7 +231,7 @@ void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *li
 		return group_id;
 	}
 
-	// Get count
+	// Get count of objects at this level in the source file
 	int count;
 	herr_t get_num_objs_return_val = H5Gget_num_objs(group_id, &count);
 
@@ -216,7 +240,7 @@ void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *li
 		return get_num_objs_return_val;
 	}
 
-	// Sum
+	// Add to the total count
 	number_of_objects += count;
 }
 
@@ -224,16 +248,19 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	// Fetch original function
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 
-	use_precarved = getenv("USE_PRECARVED");
-
+	// Create name of the precarved file
 	int filename_length = strlen(filename);
 	char filename_copy[filename_length];
 	strcpy(filename_copy, filename);
 	char *filename_without_extension = strtok(filename_copy, ".");
 	char *precarved_filename = strcat(filename_without_extension, "_precarved.hdf5");
 
-	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {
+	// Fetch USE_PRECARVED environment variable
+	use_precarved = getenv("USE_PRECARVED");
 
+	// Check if USE_PRECARVED environment variable has been set
+	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {
+		// Open precarved file
 		src_file_id = original_H5Fopen(precarved_filename, flags, fapl_id);
 
 		if (src_file_id == H5I_INVALID_HID) {
@@ -243,6 +270,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return src_file_id;
 	}
 
+	// Open source file
 	src_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 	if (src_file_id == H5I_INVALID_HID) {
@@ -250,6 +278,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	// Open root group of source file
 	hid_t group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);
 
 	if (group_location_id == H5I_INVALID_HID) {
@@ -257,7 +286,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	// Get total object (datasets, groups etc.) count 
+	// Get total object count in source file
 	herr_t get_num_objs_return_val = H5Gget_num_objs(group_location_id, &number_of_objects);
 
 	if (get_num_objs_return_val < 0) {
@@ -265,6 +294,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}	
 
+	// Iterate over group at root level in the source file, and count objects under that group
 	herr_t group_iterate_return_val = H5Giterate(group_location_id, "/", NULL, count_objects_in_group, NULL);
 
 	if (group_iterate_return_val < 0) {
@@ -272,13 +302,13 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	// Initialize the buffer to record objects accessed
+	// Initialize the buffer to record datasets accessed
 	datasets_accessed = malloc(number_of_objects * sizeof(char*));
 	for (int i = 0; i < number_of_objects; i++) {
 		datasets_accessed[i] = NULL;
 	}
 
-	// Create precarved file and open the root group so we can duplicate the general structure of our source file, excluding the contents
+	// Create destination (to-be precarved) file and open the root group to duplicate the general structure of source file
 	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 	if (dest_file_id == H5I_INVALID_HID) {
@@ -286,6 +316,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	// Open root group of destination file
 	hid_t destination_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
 
 	if (destination_group_location_id == H5I_INVALID_HID) {
@@ -293,8 +324,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	// Start DFS to make a copy of the HDF5 structure without populating contents i.e a "skeleton" 
-	// This is needed so that the Python script doesn't error out (because due to lazy loading, only the datasets whose elements the Python script accesses are called via H5Dread, and hence only those datasets are copied. Datasets that are accessed, but whose elements are not accessed in the Python script, will not be copied but will give error as they won't exist in the precarved file).
+	// Start DFS to make a copy of the HDF5 file structure without populating contents i.e a "skeleton" 
 	herr_t link_iterate_return_val = H5Literate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &destination_group_location_id); // Iterate through each object and create shallow copy
 
 	if (link_iterate_return_val < 0) {
@@ -302,6 +332,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	// Iterate over attributes at root level in the source file and make non-shallow copies in the destination file
 	herr_t attribute_iterate_return_val = H5Aiterate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &destination_group_location_id); // Iterate through each object and create shallow copy
 
 	if (attribute_iterate_return_val < 0) {
@@ -317,12 +348,15 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
 	herr_t return_val = original_H5Dread(dataset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
 
+	// Fetch USE_PRECARVED environment variable
 	use_precarved = getenv("USE_PRECARVED");
 
+	// Check if USE_PRECARVED environment variable has been set and return if it has
 	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {	
 		return return_val;
 	}
 
+	// Fetch length of name of dataset
     int size_of_name_buffer = H5Iget_name(dataset_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
     if (size_of_name_buffer == 0) {
@@ -330,20 +364,24 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     	return -1;
     }
 
+   	// Create and populate buffer for dataset name
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
 
+    // Iterate over datasets accessed and create copies in the destination file, including contents
     for (int i = 0; i < number_of_objects; i++) {
     	// If dataset access has already been recorded, ignore and break
     	if (datasets_accessed[i] != NULL && strcmp(datasets_accessed[i], dataset_name) == 0) {
     		break;
     	}
 
-    	// If dataset access has not been recorded, record and make copy of the dataset in the precarved file
+    	// If dataset access has not been recorded, record and make copy of the dataset in the destination file
     	if (datasets_accessed[i] == NULL) {
+    		// Populate ith element of array with the name of dataset
     		datasets_accessed[i] = malloc(size_of_name_buffer);
     		datasets_accessed[i] = dataset_name;
     		
+    		// Open skeleton dataset in the destination file
     		hid_t destination_dataset_id, dest_data_space;
     		destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
@@ -352,14 +390,15 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     			return destination_dataset_id;
     		}
 
-    		int rank = H5Sget_simple_extent_ndims(dest_data_space); // Retrives the number of dimensions of dataset. Returns -1 if dataset is empty, which in this case it is
+    		// Retrives the number of dimensions of dataset. Returns -1 if dataset is empty, which in this case it is
+    		int rank = H5Sget_simple_extent_ndims(dest_data_space);
 			
-			// If dataset is empty, delete empty copy so that we are able to make a new copy with contents populated, otherwise it errors out (citing the dataset already exists)
+			// If dataset is empty, delete empty copy so that we are able to make a new copy with contents populated
 			if (rank < 0) {
 				H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
 			}
 
-			// Make copy of dataset in precarved file
+			// Make copy of dataset in the destination file
     		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
     		if (object_copy_return_val < 0) {
