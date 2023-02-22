@@ -22,22 +22,60 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return 0;
 	}
 
-	// printf("%d\n", *dest_object_id);
 	// Open the object
 	hid_t src_attribute_id = H5Aopen(loc_id, name, H5P_DEFAULT);
 
+	if (src_attribute_id < 0) {
+		printf("Error opening attribute\n");
+		return -1;
+	}
+
 	int size_of_name_buffer = H5Aget_name(src_attribute_id, NULL, 0) + 1;
+
+	if (size_of_name_buffer < 0) {
+		printf("Error fetching attribute name\n");
+		return -1;
+	}
+
 	char *name_of_attribute = (char *)malloc(size_of_name_buffer);
 	H5Aget_name(src_attribute_id, size_of_name_buffer, name_of_attribute);
 	attribute_data_type = H5Aget_type(src_attribute_id);
+
+	if (attribute_data_type == H5I_INVALID_HID) {
+		printf("Error fetching attribute data type\n");
+		return -1;
+	}
+
 	attribute_data_space = H5Aget_space(src_attribute_id);
+
+	if (attribute_data_space < 0) {
+		printf("Error fetching attribute data space\n");
+		return -1;
+	}
+
 	hsize_t attribute_data_size = H5Aget_storage_size(src_attribute_id);
+
 	void* attribute_data_buffer = malloc(attribute_data_size);
-	H5Aread(src_attribute_id, attribute_data_type, attribute_data_buffer);
+	herr_t read_return_val = H5Aread(src_attribute_id, attribute_data_type, attribute_data_buffer);
+
+	if (read_return_val < 0) {
+		printf("Error reading attribute data\n");
+		return -1;
+	}
 
 	dest_attribute_id = H5Acreate1(*dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
-	// printf("Creating attribute: %s\n", name_of_attribute);
-	H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
+	
+	if (dest_attribute_id < 0) {
+		printf("Error creating attribute\n");
+		return -1;
+	}
+
+	herr_t write_return_val = H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
+
+	if (write_return_val < 0) {
+		printf("Error writing attribute\n");
+		return -1;
+	}
 
 	free(name_of_attribute);
 	return 0;
@@ -49,17 +87,35 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	// Open the object
 	hid_t object_id = H5Oopen(loc_id, name, H5P_DEFAULT);
 
+	if (object_id < 0) {
+		printf("Error opening object\n");
+		return -1;
+	}
+
 	hid_t *dest_parent_object_id = (hid_t *)opdata;
 	
 	if (dest_parent_object_id == NULL) {
-		return 0;
+		printf("Error due to NULL destination file parent object\n");
+		return -1;
 	}
 
 	// hid_t dest_object = H5Gopen(dest_file_id, "/foo", H5P_DEFAULT);
 
 	// Fetch object type
 	H5I_type_t object_type = H5Iget_type(object_id);
+
+	if (object_type == H5I_BADID) {
+		printf("Error fetching type of identifier\n");
+		return -1;
+	}
+
 	int size_of_name_buffer = H5Iget_name(object_id, NULL, 0) + 1; // Preliminary call to fetch length of object name
+
+	if (size_of_name_buffer == 0) {
+		printf("Error fetching size of name\n");
+		return -1;
+	}
+
     const char *object_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
@@ -67,48 +123,78 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	
 	// If object is a dataset, make shallow copy
 	if (object_type == H5I_DATASET) {
-		printf("Creating shallow copy of dataset %s\n", name);
-
 		hid_t dset_id, data_type, data_space;
 		dset_id = H5Dopen(src_file_id, object_name, H5P_DEFAULT);
+
+		if (dset_id == H5I_INVALID_HID) {
+			printf("Error opening dataset\n");
+			return -1;
+		}
+
 		data_type = H5Dget_type(dset_id);
+
+		if (data_type == H5I_INVALID_HID) {
+			printf("Error fetching type of dataset\n");
+			return -1;
+		}
+
 		data_space = H5Dget_space(dset_id);
-		hid_t create_plist = H5Dget_create_plist(dset_id);	
+
+		if (data_space == H5I_INVALID_HID) {
+			printf("Error fetching data space of dataset\n");
+			return -1;
+		}
+
+		hid_t create_plist = H5Dget_create_plist(dset_id);
+
+		if (create_plist == H5I_INVALID_HID) {
+			printf("Error fetching dataset creation property list\n");
+			return -1;
+		}
 
 		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
-			herr_t is_success = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
+			herr_t object_copy_return_val = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
 
-			if (is_success < 0) {
+			if (object_copy_return_val < 0) {
 	    		printf("Copying %s failed in shallow_copy_object.\n", object_name);
+	    		return -1;
 	    	}
 		} else {
 			hid_t dest_dset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
 			if (dest_dset_id < 0) {
 				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
+				return -1;
 			}
 
-			H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dset_id); // Iterate through each attribute and create a copy
+			herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dset_id); // Iterate through each attribute and create a copy
+
+			if (attribute_iterate_return_val < 0) {
+				printf("Attribute iteration failed\n");
+				return -1;
+			}
 		}
 	// If object is a group, recursively make shallow copy of the group
 	} else if (object_type == H5I_GROUP) {
-		printf("Creating shallow copy of group %s\n", name);
-		// printf("Dest Root group %d\n", *dest_parent_object_id);
-		// hid_t dest_group_id = H5Gcreate(*dest_parent_object_id, object_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 		hid_t dest_group_id = H5Gcreate1(*dest_parent_object_id, name, size_of_name_buffer);
 
 		if (dest_group_id < 0) {
 			printf("Error creating shallow copy of group %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
-		} else {
-			printf("Success!\n");
+			return -1;
+		}
+
+		herr_t link_iterate_return_val = H5Literate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_group_id);
+
+		if (link_iterate_return_val < 0) {
+			printf("Link iteration failed\n");
+		}
+
+		herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_group_id); // Iterate through each attribute and create a copy
+		
+		if (attribute_iterate_return_val < 0) {
+			printf("Attribute iteration failed\n");
+			return -1;
 		}		
-
-		// dest_group_id = H5Gopen(dest_file_id, name, H5P_DEFAULT); // Opening the 
-		// printf("Opened created group id: %d\n", opened_dest_group_id);
-
-		// H5Literate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_group_id);
-		H5Literate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_group_id);
-		H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_group_id); // Iterate through each attribute and create a copy
 	}
 	
 	return 0;
@@ -118,9 +204,19 @@ void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *li
 	// Open the object
 	hid_t group_id = H5Oopen(loc_id, name, H5P_DEFAULT);
 
+	if (group_id < 0) {
+		printf("Error opening object\n");
+		return -1;
+	}
+
 	// Get count
 	int count;
-	H5Gget_num_objs(group_id, &count);
+	herr_t get_num_objs_return_val = H5Gget_num_objs(group_id, &count);
+
+	if (get_num_objs_return_val < 0) {
+		printf("Error fetching object count\n");
+		return -1;
+	}
 
 	// Sum
 	num_of_datasets_and_groups += count;
@@ -130,11 +226,33 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	// Original function call
 	orig_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 	src_file_id = orig_H5Fopen(filename, flags, fapl_id);
+
+	if (src_file_id == H5I_INVALID_HID) {
+		printf("Error calling original H5Fopen function.\n");
+		return H5I_INVALID_HID;
+	}
+
 	hid_t g_loc_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);
 
+	if (g_loc_id == H5I_INVALID_HID) {
+		printf("Error opening source file root group\n");
+		return H5I_INVALID_HID;
+	}
+
 	// Get total object (datasets, groups etc.) count 
-	H5Gget_num_objs(g_loc_id, &num_of_datasets_and_groups);
-	H5Giterate(g_loc_id, "/", NULL, count_objects_in_group, NULL);
+	herr_t get_num_objs_return_val = H5Gget_num_objs(g_loc_id, &num_of_datasets_and_groups);
+
+	if (get_num_objs_return_val < 0) {
+		printf("Error fetching object count\n");
+		return H5I_INVALID_HID;
+	}	
+
+	herr_t group_iterate_return_val = H5Giterate(g_loc_id, "/", NULL, count_objects_in_group, NULL);
+
+	if (group_iterate_return_val < 0) {
+		printf("Group iteration failed\n");
+		return H5I_INVALID_HID;
+	}
 
 	// Initialize the buffer to record objects accessed
 	datasets_groups_accessed = malloc(num_of_datasets_and_groups * sizeof(char*));
@@ -144,24 +262,48 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 
 	// Create precarved file and open the root group so we can duplicate the general structure of our source file, excluding the contents
 	dest_file_id = H5Fcreate("precarved.hdf5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+
+	if (dest_file_id == H5I_INVALID_HID) {
+		printf("Error creating destination file\n");
+		return H5I_INVALID_HID;
+	}
+
 	hid_t dest_g_loc_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+
+	if (dest_g_loc_id == H5I_INVALID_HID) {
+		printf("Error opening destination file root group\n");
+		return H5I_INVALID_HID;
+	}
 
 	// Start DFS to make a copy of the HDF5 structure without populating contents i.e a "skeleton" 
 	// This is needed so that the Python script doesn't error out (because due to lazy loading, only the datasets whose elements the Python script accesses are called via H5Dread, and hence only those datasets are copied. Datasets that are accessed, but whose elements are not accessed in the Python script, will not be copied but will give error as they won't exist in the precarved file).
-	H5Literate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_g_loc_id); // Iterate through each object and create shallow copy
-	H5Aiterate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_g_loc_id); // Iterate through each object and create shallow copy
+	herr_t link_iterate_return_val = H5Literate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &dest_g_loc_id); // Iterate through each object and create shallow copy
+
+	if (link_iterate_return_val < 0) {
+		printf("Link iteration failed\n");
+		return H5I_INVALID_HID;
+	}
+
+	herr_t attribute_iterate_return_val = H5Aiterate2(g_loc_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_g_loc_id); // Iterate through each object and create shallow copy
+
+	if (attribute_iterate_return_val < 0) {
+		printf("Attribute iteration failed\n");
+		return H5I_INVALID_HID;
+	}
 	
 	return src_file_id;
 }
 
 herr_t H5Dread(hid_t dset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_space_id, hid_t	dxpl_id, void *buf)	{
     int size_of_name_buffer = H5Iget_name(dset_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
+
+    if (size_of_name_buffer == 0) {
+    	printf("Error fetching size of dataset name buffer\n");
+    	return -1;
+    }
+
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
-
-    // printf("H5Dread HIT!\n");
-    printf("Reading object %s\n", dataset_name);
-    printf("num_of_datasets_and_groups %d\n", num_of_datasets_and_groups);
 
     for (int j = 0; j < num_of_datasets_and_groups; j++) {
     	// If dataset access has already been recorded, ignore and break
@@ -177,6 +319,12 @@ herr_t H5Dread(hid_t dset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_
     		
     		hid_t destination_dset_id, dest_data_space;
     		destination_dset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
+
+    		if (destination_dset_id == H5I_INVALID_HID) {
+    			printf("Error opening dataset\n");
+    			return H5I_INVALID_HID;
+    		}
+
     		int rank = H5Sget_simple_extent_ndims(dest_data_space); // Retrives the number of dimensions of dataset. Returns -1 if dataset is empty, which in this case it is
 			
 			// If dataset is empty, delete empty copy so that we are able to make a new copy with contents populated, otherwise it errors out (citing the dataset already exists)
