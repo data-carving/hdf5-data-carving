@@ -226,8 +226,15 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 
 	use_precarved = getenv("USE_PRECARVED");
 
+	int filename_length = strlen(filename);
+	char filename_copy[filename_length];
+	strcpy(filename_copy, filename);
+	char *filename_without_extension = strtok(filename_copy, ".");
+	char *precarved_filename = strcat(filename_without_extension, "_precarved.hdf5");
+
 	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {
-		src_file_id = original_H5Fopen("precarved.hdf5", flags, fapl_id);
+
+		src_file_id = original_H5Fopen(precarved_filename, flags, fapl_id);
 
 		if (src_file_id == H5I_INVALID_HID) {
 			printf("Error opening precarved file\n");
@@ -272,7 +279,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	}
 
 	// Create precarved file and open the root group so we can duplicate the general structure of our source file, excluding the contents
-	dest_file_id = H5Fcreate("precarved.hdf5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 	if (dest_file_id == H5I_INVALID_HID) {
 		printf("Error creating destination file\n");
