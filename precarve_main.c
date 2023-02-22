@@ -13,6 +13,7 @@ int number_of_objects;
 char **datasets_accessed = NULL;
 hid_t src_file_id;
 hid_t dest_file_id;
+char *use_precarved;
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
@@ -220,12 +221,25 @@ void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *li
 }
 
 hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
-	// Original function call
+	// Fetch original function
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
+
+	use_precarved = getenv("USE_PRECARVED");
+
+	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {
+		src_file_id = original_H5Fopen("precarved.hdf5", flags, fapl_id);
+
+		if (src_file_id == H5I_INVALID_HID) {
+			printf("Error opening precarved file\n");
+		}
+
+		return src_file_id;
+	}
+
 	src_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 	if (src_file_id == H5I_INVALID_HID) {
-		printf("Error calling original H5Fopen function.\n");
+		printf("Error calling original H5Fopen function\n");
 		return H5I_INVALID_HID;
 	}
 
@@ -292,6 +306,16 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 }
 
 herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_space_id, hid_t	dxpl_id, void *buf)	{
+    // Original function call
+	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
+	herr_t return_val = original_H5Dread(dataset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
+
+	use_precarved = getenv("USE_PRECARVED");
+
+	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {	
+		return return_val;
+	}
+
     int size_of_name_buffer = H5Iget_name(dataset_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
     if (size_of_name_buffer == 0) {
@@ -339,10 +363,6 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     		break;
     	}
     }
-
-    // Original function call
-	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
-	herr_t return_val = original_H5Dread(dataset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
 	
 	return return_val;
 }
