@@ -22,7 +22,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return 0;
 	}
 
-	printf("%d\n", *dest_object_id);
+	// printf("%d\n", *dest_object_id);
 	// Open the object
 	hid_t src_attribute_id = H5Aopen(loc_id, name, H5P_DEFAULT);
 
@@ -76,7 +76,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		hid_t create_plist = H5Dget_create_plist(dset_id);	
 
 		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
-			printf("COPY HIT\n");
 			herr_t is_success = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
 
 			if (is_success < 0) {
@@ -87,16 +86,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 
 			if (dest_dset_id < 0) {
 				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
-			} else {
-				printf("Success!\n");
-
-				// if (name == "axis0" || name == "axis1" || name == "block0_items") {
-				// 	hsize_t dataset_data_size = H5Dget_storage_size(object_id);
-				// 	void* dataset_data_buffer = malloc(dataset_data_size);
-					
-				// 	orig_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
-				// 	herr_t return_val = orig_H5Dread(object_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
-				// }
 			}
 
 			H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dset_id); // Iterate through each attribute and create a copy
@@ -125,15 +114,28 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	return 0;
 }
 
+void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+	// Open the object
+	hid_t group_id = H5Oopen(loc_id, name, H5P_DEFAULT);
+
+	// Get count
+	int count;
+	H5Gget_num_objs(group_id, &count);
+
+	// Sum
+	num_of_datasets_and_groups += count;
+}
+
 hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	// Original function call
 	orig_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 	src_file_id = orig_H5Fopen(filename, flags, fapl_id);
+	hid_t g_loc_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);
 
-	// Get total immediate objects (datasets, groups etc.) under root
-	// TODO: Need to get total number of objects in whole file instead of just immediate. Do a DFS again and compute sum of objects.
-	H5Gget_num_objs(src_file_id, &num_of_datasets_and_groups);
-	
+	// Get total object (datasets, groups etc.) count 
+	H5Gget_num_objs(g_loc_id, &num_of_datasets_and_groups);
+	H5Giterate(g_loc_id, "/", NULL, count_objects_in_group, NULL);
+
 	// Initialize the buffer to record objects accessed
 	datasets_groups_accessed = malloc(num_of_datasets_and_groups * sizeof(char*));
 	for (int i = 0; i < num_of_datasets_and_groups; i++) {
@@ -142,7 +144,6 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 
 	// Create precarved file and open the root group so we can duplicate the general structure of our source file, excluding the contents
 	dest_file_id = H5Fcreate("precarved.hdf5", H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	hid_t g_loc_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);
 	hid_t dest_g_loc_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
 
 	// Start DFS to make a copy of the HDF5 structure without populating contents i.e a "skeleton" 
@@ -157,6 +158,10 @@ herr_t H5Dread(hid_t dset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_
     int size_of_name_buffer = H5Iget_name(dset_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
+
+    // printf("H5Dread HIT!\n");
+    printf("Reading object %s\n", dataset_name);
+    printf("num_of_datasets_and_groups %d\n", num_of_datasets_and_groups);
 
     for (int j = 0; j < num_of_datasets_and_groups; j++) {
     	// If dataset access has already been recorded, ignore and break
