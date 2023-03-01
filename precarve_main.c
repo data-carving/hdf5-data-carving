@@ -158,14 +158,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return data_space;
 		}
 
-		// Fetch dataset creation property list identifier of dataset in source file
-		hid_t dataset_creation_property_list_id = H5Dget_create_plist(dataset_id);
-
-		if (dataset_creation_property_list_id == H5I_INVALID_HID) {
-			printf("Error fetching dataset creation property list identifier\n");
-			return dataset_creation_property_list_id;
-		}
-
 		// If dataset is "axis0", "axis1", or "block0_items", make deep copy
 		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
 			herr_t object_copy_return_val = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
@@ -176,8 +168,24 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	    	}
 	    // Otherwise, make shallow copy of the dataset
 		} else {
+			// Fetch dataset creation property list identifier of dataset in source file
+			hid_t dataset_creation_property_list_id = H5Dget_create_plist(dataset_id);
+
+			if (dataset_creation_property_list_id == H5I_INVALID_HID) {
+				printf("Error fetching dataset creation property list identifier\n");
+				return dataset_creation_property_list_id;
+			}
+
+			// Fetch dataset access property list identifier of a dataset in source file
+			hid_t dataset_access_property_list_id = H5Dget_access_plist(dataset_id);
+
+			if (dataset_access_property_list_id == H5I_INVALID_HID) {
+				printf("Error fetching dataset access property list identifier\n");
+				return dataset_access_property_list_id;
+			}
+
 			// Create dataset in destination file
-			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, dataset_creation_property_list_id, dataset_access_property_list_id);
 
 			if (dest_dataset_id < 0) {
 				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
@@ -308,8 +316,24 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 		datasets_accessed[i] = NULL;
 	}
 
+	// Fetch file creation property list identifier of source file
+	hid_t file_creation_property_list_id = H5Fget_create_plist(src_file_id);
+
+	if (file_creation_property_list_id == H5I_INVALID_HID) {
+		printf("Error fetching file creation property list identifier\n");
+		return file_creation_property_list_id;
+	}
+
+	// Fetch file access property list identifier of source file
+	hid_t file_access_property_list_id = H5Fget_access_plist(src_file_id);
+
+	if (file_access_property_list_id == H5I_INVALID_HID) {
+		printf("Error fetching file access property list identifier\n");
+		return file_access_property_list_id;
+	}
+
 	// Create destination (to-be precarved) file and open the root group to duplicate the general structure of source file
-	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, file_creation_property_list_id, file_access_property_list_id);
 
 	if (dest_file_id == H5I_INVALID_HID) {
 		printf("Error creating destination file\n");
