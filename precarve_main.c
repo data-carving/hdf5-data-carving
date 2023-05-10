@@ -261,7 +261,9 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	char filename_copy[filename_length];
 	strcpy(filename_copy, filename);
 	char *filename_without_extension = strtok(filename_copy, ".");
-	char *precarved_filename = strcat(filename_without_extension, "_precarved.hdf5");
+	char precarved_suffix[] = "_precarved.hdf5";
+	char precarved_filename[] = strcat(filename_without_extension, precarved_suffix);
+	// fapl_id = H5Pcreate(H5P_FILE_ACCESS);
 
 	// Fetch USE_PRECARVED environment variable
 	use_precarved = getenv("USE_PRECARVED");
