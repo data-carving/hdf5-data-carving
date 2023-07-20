@@ -257,13 +257,17 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 
 	// Create name of the precarved file
-	int filename_length = strlen(filename);
-	char filename_copy[filename_length];
+	int filename_absolute_path_length = strlen(filename);
+	char filename_copy[filename_absolute_path_length];
 	strcpy(filename_copy, filename);
-	char *filename_without_extension = strtok(filename_copy, ".");
-	char precarved_suffix[] = "_precarved.hdf5";
-	char precarved_filename[] = strcat(filename_without_extension, precarved_suffix);
-	// fapl_id = H5Pcreate(H5P_FILE_ACCESS);
+	char *filename_without_directory_separators = strrchr(filename_copy, '/') + 1;
+	char *filename_without_extension = strtok(filename_without_directory_separators, ".");
+	char precarved_suffix[] = "_carved.h5";
+	int filename_length = strlen(filename_without_extension);
+	int suffix_length = strlen(precarved_suffix);
+	char *precarved_filename = malloc(sizeof(char) * (filename_length + suffix_length + 1));
+	strcpy(precarved_filename, filename_without_extension);
+	strcat(precarved_filename, precarved_suffix);
 
 	// Fetch USE_PRECARVED environment variable
 	use_precarved = getenv("USE_PRECARVED");
