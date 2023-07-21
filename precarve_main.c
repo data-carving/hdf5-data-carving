@@ -260,14 +260,24 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	int filename_absolute_path_length = strlen(filename);
 	char filename_copy[filename_absolute_path_length];
 	strcpy(filename_copy, filename);
-	char *filename_without_directory_separators = strrchr(filename_copy, '/') + 1;
+
+	char *filename_without_directory_separators = strrchr(filename_copy, '/');
+	
+	if (filename_without_directory_separators == NULL) {
+		filename_without_directory_separators = filename_copy;
+	} else {
+		filename_without_directory_separators += 1; // add 1 to remove the starting '/'
+	}
+
 	char *filename_without_extension = strtok(filename_without_directory_separators, ".");
-	char precarved_suffix[] = "_carved.h5";
+	char *filename_extension = strtok(NULL, ".");
+	char precarved_suffix[] = "_carved.";
 	int filename_length = strlen(filename_without_extension);
 	int suffix_length = strlen(precarved_suffix);
 	char *precarved_filename = malloc(sizeof(char) * (filename_length + suffix_length + 1));
 	strcpy(precarved_filename, filename_without_extension);
 	strcat(precarved_filename, precarved_suffix);
+	strcat(precarved_filename, filename_extension);
 
 	// Fetch USE_PRECARVED environment variable
 	use_precarved = getenv("USE_PRECARVED");
