@@ -168,24 +168,8 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	    	}
 	    // Otherwise, make shallow copy of the dataset
 		} else {
-			// Fetch dataset creation property list identifier of dataset in source file
-			hid_t dataset_creation_property_list_id = H5Dget_create_plist(dataset_id);
-
-			if (dataset_creation_property_list_id == H5I_INVALID_HID) {
-				printf("Error fetching dataset creation property list identifier\n");
-				return dataset_creation_property_list_id;
-			}
-
-			// Fetch dataset access property list identifier of a dataset in source file
-			hid_t dataset_access_property_list_id = H5Dget_access_plist(dataset_id);
-
-			if (dataset_access_property_list_id == H5I_INVALID_HID) {
-				printf("Error fetching dataset access property list identifier\n");
-				return dataset_access_property_list_id;
-			}
-
 			// Create dataset in destination file
-			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, dataset_creation_property_list_id, dataset_access_property_list_id);
+			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
 			if (dest_dataset_id < 0) {
 				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
@@ -422,7 +406,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     		datasets_accessed[i] = dataset_name;
     		
     		// Open skeleton dataset in the destination file
-    		hid_t destination_dataset_id, dest_data_space;
+    		hid_t destination_dataset_id;
     		destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
     		if (destination_dataset_id == H5I_INVALID_HID) {
@@ -430,12 +414,13 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     			return destination_dataset_id;
     		}
 
-    		// Retrives the number of dimensions of dataset. Returns -1 if dataset is empty, which in this case it is
-    		int rank = H5Sget_simple_extent_ndims(dest_data_space);
-			
-			// If dataset is empty, delete empty copy so that we are able to make a new copy with contents populated
-			if (rank < 0) {
-				H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
+    		// Retrives the dataspace of dataset
+    		hid_t dest_dataspace = H5Dget_space(destination_dataset_id);
+			H5S_class_t dest_dataspace_class = H5Sget_simple_extent_type(dest_dataspace);
+
+			// If dataspace class is NULL, it means the dataset is empty. 
+			if (dest_dataspace_class == H5S_NULL) {
+				H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT); // Delete empty copy so that we are able to make a new copy with contents populated
 			}
 
 			// Make copy of dataset in the destination file
