@@ -150,8 +150,8 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 			return data_type;
 		}
 
-		// Fetch data space of dataset
-		data_space = H5Dget_space(dataset_id);
+		// Create null dataspace for shallow copy
+		data_space = H5Screate(H5S_NULL);
 
 		if (data_space == H5I_INVALID_HID) {
 			printf("Error fetching data space of dataset\n");
