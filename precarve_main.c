@@ -416,7 +416,18 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
     		// Retrives the dataspace of dataset
     		hid_t dest_dataspace = H5Dget_space(destination_dataset_id);
+
+    		if (dest_dataspace == H5I_INVALID_HID) {
+    			printf("Error getting destination dataspace\n");
+    			return dest_dataspace;
+    		}
+
 			H5S_class_t dest_dataspace_class = H5Sget_simple_extent_type(dest_dataspace);
+
+			if (dest_dataspace_class == H5S_NO_CLASS) {
+				printf("Error getting destination dataspace class\n");
+				return dest_dataspace_class;
+			}
 
 			// If dataspace class is NULL, it means the dataset is empty. 
 			if (dest_dataspace_class == H5S_NULL) {
