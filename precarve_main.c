@@ -217,6 +217,12 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	// Open the object
 	hid_t group_id = H5Oopen(loc_id, name, H5P_DEFAULT);
+	H5I_type_t group_type = H5Iget_type(group_id);
+
+	// H5GIterate seems to also iterate over datasets. Hence, if mistakenly selected a dataset, return 0, since datasets are leaf nodes.
+	if (group_type == H5I_DATASET) {
+		return 0;
+	}
 
 	if (group_id < 0) {
 		printf("Error opening object\n");
