@@ -339,7 +339,7 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	}
 
 	// Create destination (to-be precarved) file and open the root group to duplicate the general structure of source file
-	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, file_creation_property_list_id, file_access_property_list_id);
+	dest_file_id = H5Fcreate(precarved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 	if (dest_file_id == H5I_INVALID_HID) {
 		printf("Error creating destination file\n");
@@ -437,7 +437,11 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 			// If dataspace class is NULL, it means the dataset is empty. 
 			if (dest_dataspace_class == H5S_NULL) {
-				H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT); // Delete empty copy so that we are able to make a new copy with contents populated
+				herr_t link_deletion = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT); // Delete empty copy so that we are able to make a new copy with contents populated
+
+				if (link_deletion < 0) {
+					printf("Link deletion failed");
+				}
 			}
 
 			// Make copy of dataset in the destination file
