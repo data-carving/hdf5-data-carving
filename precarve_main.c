@@ -8,12 +8,14 @@
 
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
+hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
 
 int number_of_objects;
 char **datasets_accessed = NULL;
 hid_t src_file_id;
 hid_t dest_file_id;
 char *use_precarved;
+hid_t original_file_id;
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
@@ -275,7 +277,13 @@ hid_t H5Fopen (const char * filename, unsigned flags, hid_t fapl_id) {
 	// Check if USE_PRECARVED environment variable has been set
 	if (use_precarved != NULL && strcmp(use_precarved, "1") == 0) {
 		// Open precarved file
-		src_file_id = original_H5Fopen(precarved_filename, flags, fapl_id);
+		original_file_id = original_H5Fopen(filename, flags, fapl_id);
+
+		if (original_file_id == H5I_INVALID_HID) {
+			printf("Error opening original file to be used as fallback.\n");
+		}
+
+		src_file_id = original_H5Fopen(precarved_filename, flags, H5P_DEFAULT);
 
 		if (src_file_id == H5I_INVALID_HID) {
 			printf("Error opening precarved file\n");
@@ -456,5 +464,49 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     	}
     }
 	
+	return return_val;
+}
+
+hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
+	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
+	hid_t return_val = original_H5Oopen(loc_id, name, lapl_id);
+
+	if (return_val == H5I_INVALID_HID) {
+		printf("Error opening object\n");
+		return return_val;
+	}
+
+	// Fetch type of object
+	H5I_type_t object_type = H5Iget_type(return_val);
+
+	if (object_type == H5I_BADID) {
+		printf("Error fetching object type in interposed H5Oopen\n");
+		return return_val;
+	}
+
+	// Only trigger fallback if the object is a dataset (since H5Oopen can also be used to open files, groups, and datatypes)
+	if (object_type == H5I_DATASET) {
+		// Retrieves the dataspace of dataset
+		hid_t carved_file_dset_dataspace = H5Dget_space(return_val);
+
+		if (carved_file_dset_dataspace == H5I_INVALID_HID) {
+			printf("Error getting carved_file_dset dataspace\n");
+			return carved_file_dset_dataspace;
+		}
+
+		// Retrieves the type of dataspace
+		H5S_class_t carved_file_dset_dataspace_class = H5Sget_simple_extent_type(carved_file_dset_dataspace);
+
+		if (carved_file_dset_dataspace_class == H5S_NO_CLASS) {
+			printf("Error getting carved_file_dset dataspace class\n");
+			return carved_file_dset_dataspace_class;
+		}
+
+		// If dataspace class is NULL, it means the dataset is empty. If so, return original dataset.
+		if (carved_file_dset_dataspace_class == H5S_NULL) {
+			return_val = original_H5Oopen(original_file_id, name, lapl_id);
+		}
+	}
+
 	return return_val;
 }
