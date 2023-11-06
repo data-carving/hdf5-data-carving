@@ -30,7 +30,7 @@ The carving mechanism also implements a fallback machinery in case a program dec
    ```
    pip uninstall h5py
    ```
-7. Install h5py based on the newly built source code with shared HDF5 libraries:
+7. Install h5py based on the newly built HDF5 source code:
    ```
    HDF5_DIR=/usr/local/hdf5 pip install --no-binary=h5py h5py
    ```
