@@ -67,5 +67,5 @@ LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" python sc
 ### Re-execution
 In addition to setting up LD_PRELOAD, set the USE_CARVED environment variable to 1:
 ```
-LD_PRELOAD="/usr/local/hdf5/H5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python script.py
+LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python script.py
 ```
