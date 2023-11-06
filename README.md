@@ -36,7 +36,7 @@ The carving mechanism also implements a fallback machinery in case a program dec
    ```
 8. Clone this repository:
    ```
-   https://github.com/raffayatiq/hdf5-data-carving.git
+   git clone https://github.com/raffayatiq/hdf5-data-carving.git
    ```
 9. In the cloned repository directory, compile the carving script using the h5cc compile script:
    ```
