@@ -1,7 +1,12 @@
 # HDF5 Data Carving
 
-A library interpositioning based HDF5 data carver that carves out the exact subset of data accessed by a program, at the granularity of [HDF5 objects](https://docs.hdfgroup.org/hdf5/develop/group___h5_o.html), while preserving metadata such as attributes. 
+A library interpositioning based HDF5 data carving system that carves out the exact subset of data accessed by a program, at the granularity of [HDF5 objects](https://docs.hdfgroup.org/hdf5/develop/group___h5_o.html), while preserving metadata such as attributes. 
+
 The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the original data while the carved file acts as a cache.
+
+The system works in 2 modes:
+1. Execution mode
+2. Re-execution mode (set by the USE_CARVED environment variable)
 
 ## Setup
 1. Download the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
@@ -13,7 +18,7 @@ The carving mechanism also implements a fallback machinery in case a program dec
    autoheader
    automake --force-missing --add-missing
    autoconf
-   ./configure --enable-shared --with-pic
+   ./configure --enable-shared --with-pic --enable-ros3-vfd
    make
    sudo make install
    sudo make check-install
@@ -49,8 +54,14 @@ The carving mechanism also implements a fallback machinery in case a program dec
     
 ## Usage
 
-
 ### Execution
+Before running a program set LD_PRELOAD to the path of the shared libraries, for example:
+```
+LD_PRELOAD="/usr/local/hdf5/H5carve.so /usr/local/hdf5/lib/libhdf5.so" python script.py
+```
 
 ### Re-execution
-   
+In addition to setting up LD_PRELOAD, set the USE_CARVED environment variable to 1:
+```
+LD_PRELOAD="/usr/local/hdf5/H5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python script.py
+```
