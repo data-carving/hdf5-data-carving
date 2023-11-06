@@ -49,11 +49,11 @@ The system works in 2 modes:
    ```
 9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
-   HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5custom_module.c H5carve.c -o H5carve.so
+   HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5custom_module.c H5carve.c -o h5carve.so
    ```
 10. Move the shared library file to the HDF5 folder in /usr/local/ directory:
     ```
-    sudo mv H5carve.so /usr/local/hdf5
+    sudo mv h5carve.so /usr/local/hdf5
     ```
     
 ## Usage
@@ -61,7 +61,7 @@ The system works in 2 modes:
 ### Execution
 Before running a program set LD_PRELOAD to the path of the shared libraries, for example:
 ```
-LD_PRELOAD="/usr/local/hdf5/H5carve.so /usr/local/hdf5/lib/libhdf5.so" python script.py
+LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" python script.py
 ```
 
 ### Re-execution
