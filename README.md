@@ -38,7 +38,7 @@ The carving mechanism also implements a fallback machinery in case a program dec
    ```
    git clone https://github.com/raffayatiq/hdf5-data-carving.git
    ```
-9. In the cloned repository directory, compile the carving script using the h5cc compile script:
+9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
    HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5custom_module.c H5carve.c -o H5carve.so
    ```
