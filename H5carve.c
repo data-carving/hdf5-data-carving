@@ -29,13 +29,14 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	// Check if USE_CARVED environment variable has been set
 	if (use_carved != NULL && strcmp(use_carved, "1") == 0) {
-		// Open carved file
+		// Open original file for fallback machinery
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 		if (original_file_id == H5I_INVALID_HID) {
 			printf("Error opening original file to be used as fallback.\n");
 		}
 
+		// Open carved file for re-execution mode
 		src_file_id = original_H5Fopen(carved_filename, flags, H5P_DEFAULT);
 
 		if (src_file_id == H5I_INVALID_HID) {
@@ -116,7 +117,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	}
 
 	// Start DFS to make a copy of the HDF5 file structure without populating contents i.e a "skeleton" 
-	herr_t link_iterate_return_val = H5Literate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &destination_group_location_id); // Iterate through each object and create shallow copy
+	herr_t link_iterate_return_val = H5Literate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &destination_group_location_id);
 
 	if (link_iterate_return_val < 0) {
 		printf("Link iteration failed\n");
@@ -124,7 +125,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	}
 
 	// Iterate over attributes at root level in the source file and make non-shallow copies in the destination file
-	herr_t attribute_iterate_return_val = H5Aiterate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &destination_group_location_id); // Iterate through each object and create shallow copy
+	herr_t attribute_iterate_return_val = H5Aiterate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &destination_group_location_id);
 
 	if (attribute_iterate_return_val < 0) {
 		printf("Attribute iteration failed\n");
@@ -142,7 +143,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
-	// Check if USE_CARVED environment variable has been set and return if it has
+	// Check if USE_CARVED environment variable has been set and return if it has (if it has been set, the carved file is queried by the above H5Dread call)
 	if (use_carved != NULL && strcmp(use_carved, "1") == 0) {	
 		return return_val;
 	}
@@ -172,7 +173,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     		datasets_accessed[i] = malloc(size_of_name_buffer);
     		datasets_accessed[i] = dataset_name;
     		
-    		// Open skeleton dataset in the destination file
+    		// Open NULL dataset in the destination file
     		hid_t destination_dataset_id;
     		destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
@@ -205,6 +206,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 }
 
 hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
+	// Original function call
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 	hid_t return_val = original_H5Oopen(loc_id, name, lapl_id);
 
@@ -221,8 +223,9 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 		return return_val;
 	}
 
-	// Only trigger fallback if the object is a dataset (since H5Oopen can also be used to open files, groups, and datatypes)
+	// Only consider triggering fallback if the object is a dataset (since H5Oopen can also be used to open files, groups, and datatypes)
 	if (object_type == H5I_DATASET) {
+		// Trigger fallback if the dataset is NULL
 		if (is_dataset_null(return_val)) {
 			return_val = original_H5Oopen(original_file_id, name, lapl_id);
 		}
