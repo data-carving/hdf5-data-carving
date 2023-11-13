@@ -16,7 +16,7 @@ The system works in 2 modes:
    In this mode, the system creates the carved HDF5 file in two phases. In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset). In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
 3. Re-execution mode (set by the USE_CARVED environment variable)
 
-   The program now accesses the carved file in place of the original file. The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead.
+   The program now accesses the carved file in place of the original file. The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead. This diversion of control flow to the original file is achieved by interposing on H5Oopen and detecting if the datasets to be accessed in the carved file are empty or not.
 
 ## Setup
 1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
