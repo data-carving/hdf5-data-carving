@@ -6,10 +6,12 @@
 #include <dlfcn.h>
 #include "H5carve_helper_functions.h"
 
+// Functions being interposed on include H5Fopen, H5Dread, and H5Oopen.
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
 hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
 
+// Global variables to be used across function calls
 int number_of_objects;
 char **datasets_accessed = NULL;
 hid_t src_file_id;
@@ -17,6 +19,11 @@ hid_t dest_file_id;
 char *use_carved;
 hid_t original_file_id;
 
+/* 
+	The primary function for accessing existing HDF5 files in the HDF5 library.
+	Additional functionality added includes making an identical skeleton copy of the existing HDF5 file.
+	The copy includes all groups, datasets, and attributes but excludes the contents of the datasets.
+*/
 hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	// Fetch original function
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
@@ -134,7 +141,17 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	
 	return src_file_id;
 }
-
+/* 
+	Reads a dataset specified by DATASET_ID from the file into application
+    memory BUF. The part of the dataset to read is defined with
+    MEM_SPACE_ID and FILE_SPACE_ID. The data points are
+    converted from their file type to the MEM_TYPE_ID specified.
+    Additional miscellaneous data transfer properties can be
+    passed to this function with the DXPL_ID argument.
+    Additional functionality added includes monitoring which datasets have
+    been accessed and populating the empty datasets in the carved file
+    with the contents of the datasets accessed in the original file.
+*/
 herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_space_id, hid_t	dxpl_id, void *buf)	{
     // Original function call
 	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
@@ -205,6 +222,12 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	return return_val;
 }
 
+/*
+	Opens an object within an HDF5 file.
+	Additional functionality added includes monitoring if the datasets accessed in re-execution mode
+	are present in the carved file or not. If not, diverts the control flow to access the dataset in 
+	the original file instead of the carved file.
+*/
 hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	// Original function call
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
