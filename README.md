@@ -8,12 +8,12 @@ The carving mechanism is based on interposing on three HDF5 C API calls, namely 
 <img alt="HDF5 Data Carving" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaDc4kGWh7ouN4KzqP4MKRkUEGAouKaPiYsxcycg6nTCxPUHPQtqVpviFV--j7MLyUpQLqPJVZsUrX42k6vj55NTnGh0mA=w1366-h664">
 </p>
 
-The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the original data while the carved file acts as a cache.
+The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the data in the original file instead of the carved file.
 
 The system works in 2 modes:
 1. Execution mode
 
-   The system creates the carved HDF5 file in two phases. In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset). In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
+   In this mode, the system creates the carved HDF5 file in two phases. In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset). In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
 3. Re-execution mode (set by the USE_CARVED environment variable)
 
    The program now accesses the carved file in place of the original file. The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead.
