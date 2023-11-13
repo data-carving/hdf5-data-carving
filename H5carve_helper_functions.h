@@ -1,5 +1,5 @@
-#ifndef H5CUSTOM_MODULE_H
-#define H5CUSTOM_MODULE_H
+#ifndef H5CARVE_HELPER_FUNCTIONS_H
+#define H5CARVE_HELPER_FUNCTIONS_H
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
