@@ -19,9 +19,8 @@ The system works in 2 modes:
    The program now accesses the carved file in place of the original file. The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead.
 
 ## Setup
-1. Download the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
-2. Extract the HDF5 source code.
-3. In the source code directory, type the following commands to build the HDF5 source code with shared libraries:
+1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
+2. In the source code directory, type the following commands to build the HDF5 source code with shared libraries:
    ```
    libtoolize --force
    aclocal
@@ -33,31 +32,31 @@ The system works in 2 modes:
    sudo make install
    sudo make check-install
    ```
-4. Delete any HDF5 folder in the /usr/local/ directory (optional):
+3. Delete any HDF5 folder in the /usr/local/ directory (optional):
    ```
    sudo rm -rf /usr/local/hdf5
    ```
-5. Move newly built source code to /usr/local/:
+4. Move newly built source code to /usr/local/:
    ```
    sudo mv hdf5 /usr/local/
    ```
-6. Remove any installed h5py package (skip this step if no h5py package is installed or you intend to use a python virtual environment):
+5. Remove any installed h5py package (skip this step if no h5py package is installed or you intend to use a python virtual environment):
    ```
    pip uninstall h5py
    ```
-7. Install h5py based on the newly built HDF5 source code:
+6. Install h5py based on the newly built HDF5 source code:
    ```
    HDF5_DIR=/usr/local/hdf5 pip install --no-binary=h5py h5py
    ```
-8. Clone this repository:
+7. Clone this repository:
    ```
    git clone https://github.com/raffayatiq/hdf5-data-carving.git
    ```
-9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
+8. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
    HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5custom_module.c H5carve.c -o h5carve.so
    ```
-10. Move the shared library file to the HDF5 folder in /usr/local/ directory:
+9. Move the shared library file to the HDF5 folder in /usr/local/ directory:
     ```
     sudo mv h5carve.so /usr/local/hdf5
     ```
