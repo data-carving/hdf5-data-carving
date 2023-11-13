@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
-#include "H5custom_module.h"
+#include "H5carve_helper_functions.h"
 
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
