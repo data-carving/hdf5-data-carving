@@ -142,12 +142,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	return src_file_id;
 }
 /* 
-	Reads a dataset specified by DATASET_ID from the file into application
-    memory BUF. The part of the dataset to read is defined with
-    MEM_SPACE_ID and FILE_SPACE_ID. The data points are
-    converted from their file type to the MEM_TYPE_ID specified.
-    Additional miscellaneous data transfer properties can be
-    passed to this function with the DXPL_ID argument.
+	Reads a dataset from the HDF5 file into application memory.
     Additional functionality added includes monitoring which datasets have
     been accessed and populating the empty datasets in the carved file
     with the contents of the datasets accessed in the original file.
