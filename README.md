@@ -2,6 +2,12 @@
 
 A library interpositioning based HDF5 data carving system that carves out the exact subset of data accessed by a program, at the granularity of [HDF5 objects](https://docs.hdfgroup.org/hdf5/develop/group___h5_o.html), while preserving metadata such as attributes. 
 
+The carving mechanism is based on interposing on three HDF5 C API calls, namely H5Fopen, H5Dread, and H5Oopen. When an application makes a call to these functions, the calls are directed to the carving system instead of the original HDF5 library. The carving system implements additional functionality around the original behavior of these functions, aimed towards the objective of carving.
+
+<p align="center">
+<img alt="HDF5 Data Carving" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaDQLqu-GQ7fK51ZlVsgbfJR-0uydxu-VhwhjJ-t7ouDWFtTTdA2j-poU7I38qZuCHrs3KdAgdMcodv55sTH47W4h-P-9Q=w1366-h664">
+</p>
+
 The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the original data while the carved file acts as a cache.
 
 The system works in 2 modes:
