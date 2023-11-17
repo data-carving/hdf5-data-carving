@@ -24,7 +24,7 @@ The system works in 2 modes:
    </p>
 
    In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
-3. Re-execution mode (set by the USE_CARVED environment variable)
+3. Re-execution mode
 
    The program now accesses the carved file in place of the original file.
    <p align="center">
