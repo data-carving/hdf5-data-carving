@@ -15,12 +15,12 @@ The system works in 2 modes:
 
    In this mode, the system creates the carved HDF5 file in two phases.
    <p align="center">
-   <img width="850" height="auto" alt="H5Fopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaAsrD7ZElEgi5Fi1A_bnPdu-SLljpZVafVDhxLlwYK14I0ZR9_ZPGJYV9BHCFPkPkFOwUL9ME_ddhHJDxBiM88vQqmENA=w1366-h664">
+   <img alt="H5Fopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaAsrD7ZElEgi5Fi1A_bnPdu-SLljpZVafVDhxLlwYK14I0ZR9_ZPGJYV9BHCFPkPkFOwUL9ME_ddhHJDxBiM88vQqmENA=w1366-h664">
    </p>
    
    In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset).
    <p align="center">
-   <img width="850" height="auto" alt="H5Dread" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaBuOTI_yVfmvItYn73lBhPUNo5HiuznBmrr5hurC212_-8U6SKuPY0WxbSAvdwpCdsopyw78085egPZXbWF7kjrP29G8A=w1366-h664">
+   <img alt="H5Dread" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaBuOTI_yVfmvItYn73lBhPUNo5HiuznBmrr5hurC212_-8U6SKuPY0WxbSAvdwpCdsopyw78085egPZXbWF7kjrP29G8A=w1366-h664">
    </p>
 
    In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
@@ -28,7 +28,7 @@ The system works in 2 modes:
 
    The program now accesses the carved file in place of the original file.
    <p align="center">
-   <img width="850" height="auto" alt="H5Oopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaCYXccmZ_fH0n7aP8J0sNm2NoM_q15HM0Wd9q6OJj0cIheGuLtXF54_p18D3MoXhgUwzedvzU5kOvxtqUs7EbgtqvdjSA=w1366-h664">
+   <img alt="H5Oopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaCYXccmZ_fH0n7aP8J0sNm2NoM_q15HM0Wd9q6OJj0cIheGuLtXF54_p18D3MoXhgUwzedvzU5kOvxtqUs7EbgtqvdjSA=w1366-h664">
    </p>
    The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead. This diversion of control flow to the original file is achieved by interposing on H5Oopen and detecting if the datasets to be accessed in the carved file are empty or not.
 
