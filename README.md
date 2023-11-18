@@ -1,6 +1,6 @@
 # HDF5 Data Carving
 
-A library interpositioning based HDF5 data carving system that carves out the exact subset of data accessed by a program, at the granularity of [HDF5 objects](https://docs.hdfgroup.org/hdf5/develop/group___h5_o.html), while preserving metadata such as attributes. 
+A library interpositioning based HDF5 data carving system that carves out the exact subset of data accessed by a program, at the granularity of [HDF5 objects](https://docs.hdfgroup.org/hdf5/develop/group___h5_o.html), while preserving metadata.
 
 The carving mechanism is based on interposing on three HDF5 C API calls, namely H5Fopen, H5Dread, and H5Oopen. When an application makes a call to these functions, the calls are first directed to the carving system instead of the HDF5 library. The carving system implements additional functionality around the original behavior of these functions, aimed towards the objective of carving.
 
@@ -10,27 +10,33 @@ The carving mechanism is based on interposing on three HDF5 C API calls, namely 
 
 The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the data in the original file instead of the carved file.
 
-The system works in 2 modes:
-1. Execution mode
+The system operates in two modes. The first mode is the execution mode where the application is run with the original HDF5 file and the second mode is the re-execution mode where the application is run with the carved HDF5 file.
+
+### Execution mode
 
    In this mode, the system creates the carved HDF5 file in two phases.
+
+   In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset).
+   
    <p align="center">
    <img alt="H5Fopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaAsrD7ZElEgi5Fi1A_bnPdu-SLljpZVafVDhxLlwYK14I0ZR9_ZPGJYV9BHCFPkPkFOwUL9ME_ddhHJDxBiM88vQqmENA=w1366-h664">
    </p>
+
+   In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
    
-   In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset).
    <p align="center">
    <img alt="H5Dread" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaBuOTI_yVfmvItYn73lBhPUNo5HiuznBmrr5hurC212_-8U6SKuPY0WxbSAvdwpCdsopyw78085egPZXbWF7kjrP29G8A=w1366-h664">
    </p>
 
-   In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
-3. Re-execution mode
+### Re-execution mode
 
    The program now accesses the carved file in place of the original file.
+
+   The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead. This diversion of control flow to the original file is achieved by interposing on H5Oopen and detecting if the datasets to be accessed in the carved file are empty or not.
+   
    <p align="center">
    <img alt="H5Oopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaCYXccmZ_fH0n7aP8J0sNm2NoM_q15HM0Wd9q6OJj0cIheGuLtXF54_p18D3MoXhgUwzedvzU5kOvxtqUs7EbgtqvdjSA=w1366-h664">
    </p>
-   The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead. This diversion of control flow to the original file is achieved by interposing on H5Oopen and detecting if the datasets to be accessed in the carved file are empty or not.
 
 ## Setup
 1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
