@@ -47,7 +47,7 @@ The system operates in two modes. The first mode is the execution mode where the
    autoheader
    automake --force-missing --add-missing
    autoconf
-   ./configure --enable-shared --with-pic --enable-ros3-vfd
+   ./configure CFLAGS="-fPIC" --enable-shared --with-pic --enable-ros3-vfd
    make
    sudo make install
    sudo make check-install
@@ -62,11 +62,11 @@ The system operates in two modes. The first mode is the execution mode where the
    ```
 5. Remove any installed h5py package (skip this step if no h5py package is installed or you intend to use a python virtual environment):
    ```
-   pip uninstall h5py
+   pip3 uninstall h5py
    ```
 6. Install h5py based on the newly built HDF5 source code:
    ```
-   HDF5_DIR=/usr/local/hdf5 pip install --no-binary=h5py h5py
+   HDF5_DIR=/usr/local/hdf5 pip3 install --no-binary=h5py h5py
    ```
 7. Clone this repository:
    ```
@@ -86,11 +86,11 @@ The system operates in two modes. The first mode is the execution mode where the
 ### Execution
 Before running a program set LD_PRELOAD to the path of the shared libraries, for example:
 ```
-LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" python script.py
+LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" python3 script.py
 ```
 
 ### Re-execution
 In addition to setting up LD_PRELOAD, set the USE_CARVED environment variable to 1:
 ```
-LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python script.py
+LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python3 script.py
 ```
