@@ -39,6 +39,8 @@ The system operates in two modes. The first mode is the execution mode where the
    </p>
 
 ## Setup
+Recommended OS: Ubuntu 20.04+.
+
 1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
 2. In the source code directory, type the following commands to build the HDF5 source code with shared libraries:
    ```
@@ -68,15 +70,19 @@ The system operates in two modes. The first mode is the execution mode where the
    ```
    HDF5_DIR=/usr/local/hdf5 pip3 install --no-binary=h5py h5py
    ```
-7. Clone this repository:
+7. Install HDF5 development files and helper tools:
+   ```
+   sudo apt install libhdf5-dev hdf5-helpers
+   ```
+8. Clone this repository:
    ```
    git clone https://github.com/raffayatiq/hdf5-data-carving.git
+   ``` 
+9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
-8. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
+   HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5carve_helper_functions.c H5carve.c -o h5carve.so
    ```
-   HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5custom_module.c H5carve.c -o h5carve.so
-   ```
-9. Move the shared library file to the HDF5 folder in /usr/local/ directory:
+10. Move the shared library file to the HDF5 folder in /usr/local/ directory:
     ```
     sudo mv h5carve.so /usr/local/hdf5
     ```
