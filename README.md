@@ -19,7 +19,7 @@ The system operates in two modes. The first mode is the execution mode where the
    In the first phase triggered by the H5Fopen call, the system builds a skeleton of the HDF5 file, copying the attributes, groups, and dataset objects (without the dataset contents and with a NULL dataspace implying an empty dataset).
    
    <p align="center">
-   <img alt="H5Fopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaA7Zm2gBK_zSQrzT0cknXzxXBMPbUFL7BPGE4r5z-zWkYbt2tvU0iFVspKFvaq-ck_5MlqWCSG3Fds-X4PEBYjI2N-jEg=w1366-h664">
+   <img alt="H5Fopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaBNcbhWDrgY3zuhcKEf9rYMv4FBsWG5sWdVOn_TOUfLeyKHKfTT38spKFkx7Wuv7Wu6p3sEBU7RQzasWkAEorarZjkCYQ=w1366-h664">
    </p>
 
    In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
