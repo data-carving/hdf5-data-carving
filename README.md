@@ -35,7 +35,7 @@ The system operates in two modes. The first mode is the execution mode where the
    The carved file is accessed if the data queried is in the subset of data accessed in the original execution. For data outside this subset, the fallback machinery is triggered and the original file is accessed instead. This diversion of control flow to the original file is achieved by interposing on H5Oopen and detecting if the datasets to be accessed in the carved file are empty or not.
    
    <p align="center">
-   <img alt="H5Oopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaCLl-loPeHsPc-WbJYaFEtBiPpEZ3BaPSl0v_l3R32voBWPiDB46RhC2Ma340S6CwJzNPfxR4f9c9wpeewlekgk1utPbQ=w1366-h664">
+   <img alt="H5Oopen" src="https://lh3.googleusercontent.com/drive-viewer/AK7aPaAkDg_DGLLU7i39PnbFBshJEDJ6zdSGrd5sWe5GFvHi_QgCLCT0y57d8Zu6Ev2DTB2Uu8fvlknqkQnvkvL1BCP7hzvTcQ=w1366-h664">
    </p>
 
 ## Setup
