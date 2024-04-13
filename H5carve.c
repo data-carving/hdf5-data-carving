@@ -29,7 +29,10 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 
 	// Create name of carved file
-	char *carved_filename = get_carved_filename(filename);
+	// char *carved_filename = get_carved_filename(filename);
+	char carved_filename[strlen(filename) + 7];
+	strcat(carved_filename, filename);
+	strcat(carved_filename, ".carved");
 
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
@@ -59,6 +62,11 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	if (src_file_id == H5I_INVALID_HID) {
 		printf("Error calling original H5Fopen function\n");
 		return H5I_INVALID_HID;
+	}
+
+	// If file was opened previously, skeleton file has already been created. Skip first phase.
+	if (access(carved_filename, F_OK) == 0) {
+    	return src_file_id;
 	}
 
 	// Open root group of source file
