@@ -30,7 +30,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	// Create name of carved file
 	// char *carved_filename = get_carved_filename(filename);
-	char carved_filename[strlen(filename) + 7];
+	char carved_filename[strlen(filename) + 7 + 1];
+        carved_filename[0] = '\0';
 	strcat(carved_filename, filename);
 	strcat(carved_filename, ".carved");
 
