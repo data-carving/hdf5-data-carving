@@ -29,12 +29,29 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 
 	// Create name of carved file
-	// char *carved_filename = get_carved_filename(filename);
-	char carved_filename[strlen(filename) + 7 + 1];
-        carved_filename[0] = '\0';
-	strcat(carved_filename, filename);
-	strcat(carved_filename, ".carved");
+	char *carved_directory = getenv("CARVED_DIRECTORY");
+	
+	char *filename_without_directory_separators = strrchr(filename, '/');
+    
+    if (filename_without_directory_separators != NULL) {
+            filename_without_directory_separators = filename_without_directory_separators + 1;
+    } else {
+            filename_without_directory_separators = filename;
+    }
 
+	char carved_filename[(carved_directory == NULL ? strlen(filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
+
+	if (carved_directory == NULL) {
+	    carved_filename[0] = '\0';
+		strcat(carved_filename, filename);
+		strcat(carved_filename, ".carved");	
+	} else {
+		carved_filename[0] = '\0';
+		strcat(carved_filename, carved_directory);
+		strcat(carved_filename, filename_without_directory_separators);
+		strcat(carved_filename, ".carved");
+	}
+	
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
