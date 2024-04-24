@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern int number_of_objects;
-extern char **datasets_accessed;
 extern hid_t src_file_id;
 extern hid_t dest_file_id;
 extern char *use_precarved;
@@ -207,34 +205,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	}
 	
 	return 0;
-}
-
-void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
-	// Open the object
-	hid_t group_id = H5Oopen(loc_id, name, H5P_DEFAULT);
-	H5I_type_t group_type = H5Iget_type(group_id);
-
-	// H5GIterate seems to also iterate over datasets. Hence, if mistakenly selected a dataset, return 0, since datasets are leaf nodes.
-	if (group_type == H5I_DATASET) {
-		return 0;
-	}
-
-	if (group_id < 0) {
-		printf("Error opening object\n");
-		return group_id;
-	}
-
-	// Get count of objects at this level in the source file
-	int count;
-	herr_t get_num_objs_return_val = H5Gget_num_objs(group_id, &count);
-
-	if (get_num_objs_return_val < 0) {
-		printf("Error fetching object count\n");
-		return get_num_objs_return_val;
-	}
-
-	// Add to the total count
-	number_of_objects += count;
 }
 
 char *get_carved_filename(const char *filename) {
