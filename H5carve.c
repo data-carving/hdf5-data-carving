@@ -12,8 +12,6 @@ hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
 hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
 
 // Global variables to be used across function calls
-int number_of_objects;
-char **datasets_accessed = NULL;
 hid_t src_file_id;
 hid_t dest_file_id;
 char *use_carved;
@@ -95,28 +93,6 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	// Get total object count in source file
-	herr_t get_num_objs_return_val = H5Gget_num_objs(group_location_id, &number_of_objects);
-
-	if (get_num_objs_return_val < 0) {
-		printf("Error fetching object count\n");
-		return H5I_INVALID_HID;
-	}
-
-	// Iterate over group at root level in the source file, and count objects under that group
-	herr_t group_iterate_return_val = H5Giterate(group_location_id, "/", NULL, count_objects_in_group, NULL);
-
-	if (group_iterate_return_val < 0) {
-		printf("Group iteration failed\n");
-		return H5I_INVALID_HID;
-	}
-
-	// Initialize the buffer to record datasets accessed
-	datasets_accessed = malloc(number_of_objects * sizeof(char*));
-	for (int i = 0; i < number_of_objects; i++) {
-		datasets_accessed[i] = NULL;
-	}
-
 	// Create destination (to-be carved) file and open the root group to duplicate the general structure of source file
 	dest_file_id = H5Fcreate(carved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -182,47 +158,32 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
 
-    // Iterate over datasets accessed and create copies in the destination file, including contents
-    for (int i = 0; i < number_of_objects; i++) {
-    	// If dataset access has already been recorded, ignore and break
-    	if (datasets_accessed[i] != NULL && strcmp(datasets_accessed[i], dataset_name) == 0) {
-    		break;
-    	}
+	// Open dataset in the destination file
+	hid_t destination_dataset_id;
+	destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
-    	// If dataset access has not been recorded, record and make copy of the dataset in the destination file
-    	if (datasets_accessed[i] == NULL) {
-    		// Populate ith element of array with the name of dataset
-    		datasets_accessed[i] = malloc(size_of_name_buffer);
-    		datasets_accessed[i] = dataset_name;
-    		
-    		// Open NULL dataset in the destination file
-    		hid_t destination_dataset_id;
-    		destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
+	if (destination_dataset_id == H5I_INVALID_HID) {
+		printf("Error opening dataset\n");
+		return destination_dataset_id;
+	}
 
-    		if (destination_dataset_id == H5I_INVALID_HID) {
-    			printf("Error opening dataset\n");
-    			return destination_dataset_id;
-    		}
+	// Check if dataset is NULL in carved file. If it is, remove associated link and copy original dataset to carved file
+	if (is_dataset_null(destination_dataset_id)) {
+		// Delete empty copy so that we are able to make a new copy with contents populated
+		herr_t link_deletion = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
 
-			if (is_dataset_null(destination_dataset_id)) {
-				herr_t link_deletion = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT); // Delete empty copy so that we are able to make a new copy with contents populated
+		if (link_deletion < 0) {
+			printf("Link deletion failed");
+		}
 
-				if (link_deletion < 0) {
-					printf("Link deletion failed");
-				}
-			}
+		// Make copy of dataset in the destination file
+		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
-			// Make copy of dataset in the destination file
-    		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
-
-    		if (object_copy_return_val < 0) {
-    			printf("Copying %s failed.\n", dataset_name);
-    			return object_copy_return_val;
-    		}
-
-    		break;
-    	}
-    }
+		if (object_copy_return_val < 0) {
+			printf("Copying %s failed.\n", dataset_name);
+			return object_copy_return_val;
+		}
+	}
 	
 	return return_val;
 }
