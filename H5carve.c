@@ -59,7 +59,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 		if (original_file_id == H5I_INVALID_HID) {
-			printf("Error opening original file to be used as fallback.\n");
+			// printf("Error opening original file to be used as fallback.\n");
 		}
 
 		// Open carved file for re-execution mode
