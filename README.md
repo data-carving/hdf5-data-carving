@@ -28,7 +28,7 @@ The system operates in two modes. The first mode is the execution mode where the
    <img alt="H5Dread" src="https://github.com/raffayatiq/hdf5-data-carving/assets/58357644/6a233928-d327-4ef1-bd17-c7eda3dca9a2">
    </p>
 
-### Re-execution mode
+### Repeat mode
 
    The program now accesses the carved file in place of the original file.
 
@@ -42,61 +42,54 @@ The system operates in two modes. The first mode is the execution mode where the
 Recommended OS: Ubuntu 20.04+.
 
 1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
-2. In the source code directory, type the following commands to build the HDF5 source code with shared libraries:
+2. In the source code directory, type the following commands to build the HDF5 source code:
    ```
+   export HDF5_CARVE_LIBRARY=~/.local/libhdf5-carve
    libtoolize --force
    aclocal
    autoheader
    automake --force-missing --add-missing
    autoconf
-   ./configure CFLAGS="-fPIC" --enable-shared --with-pic --enable-ros3-vfd
+   ./configure --prefix=$HDF5_CARVE_LIBRARY --enable-ros3-vfd
    make
-   sudo make install
-   sudo make check-install
+   make install
+   make check-install
    ```
-3. Delete any HDF5 folder in the /usr/local/ directory (optional):
-   ```
-   sudo rm -rf /usr/local/hdf5
-   ```
-4. Move newly built source code to /usr/local/:
-   ```
-   sudo mv hdf5 /usr/local/
-   ```
-5. Remove any installed h5py package (skip this step if no h5py package is installed or you intend to use a python virtual environment):
+3. Remove any installed h5py package (skip this step if no h5py package is installed or you intend to use a python virtual environment):
    ```
    pip3 uninstall h5py
    ```
 6. Install h5py based on the newly built HDF5 source code:
    ```
-   HDF5_DIR=/usr/local/hdf5 pip3 install --no-binary=h5py h5py
+   HDF5_DIR=$HDF5_CARVE_LIBRARY pip3 install --no-binary=h5py h5py
    ```
 7. Install HDF5 development files and helper tools:
    ```
-   sudo apt install libhdf5-dev hdf5-helpers
+   sudo apt install libhdf5-dev hdf5-helpers hdf5-tools
    ```
 8. Clone this repository:
    ```
-   git clone https://github.com/raffayatiq/hdf5-data-carving.git
+   git clone https://github.com/data-carving/hdf5-data-carving.git
    ``` 
 9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
    HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5carve_helper_functions.c H5carve.c -o h5carve.so
    ```
-10. Move the shared library file to the HDF5 folder in /usr/local/ directory:
+10. Move the shared library file to the newly built HDF5 source code directory:
     ```
-    sudo mv h5carve.so /usr/local/hdf5
+    mv h5carve.so $HDF5_CARVE_LIBRARY/lib
     ```
     
 ## Usage
 
-### Execution
+### Execution mode
 Before running a program set LD_PRELOAD to the path of the shared libraries, for example:
 ```
-LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" python3 script.py
+LD_PRELOAD="$HDF5_CARVE_LIBRARY/lib/h5carve.so $HDF5_CARVE_LIBRARY/lib/libhdf5.so" <execution command>
 ```
 
-### Re-execution
+### Repeat mode
 In addition to setting up LD_PRELOAD, set the USE_CARVED environment variable to 1:
 ```
-LD_PRELOAD="/usr/local/hdf5/h5carve.so /usr/local/hdf5/lib/libhdf5.so" USE_CARVED=1 python3 script.py
+LD_PRELOAD="$HDF5_CARVE_LIBRARY/lib/h5carve.so $HDF5_CARVE_LIBRARY/lib/libhdf5.so" USE_CARVED=1 <execution command>
 ```
