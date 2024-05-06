@@ -39,7 +39,7 @@ The system operates in two modes. The first mode is the execution mode where the
    </p>
 
 ## Setup
-Recommended OS: Ubuntu 20.04+.
+Recommended OS: Ubuntu 22.04+.
 
 1. Download and extract the [HDF5 source code](https://www.hdfgroup.org/downloads/hdf5/source-code/).
 2. In the source code directory, type the following commands to build the HDF5 source code:
@@ -91,5 +91,5 @@ LD_PRELOAD="$HDF5_CARVE_LIBRARY/lib/h5carve.so $HDF5_CARVE_LIBRARY/lib/libhdf5.s
 ### Repeat mode
 In addition to setting up LD_PRELOAD, set the USE_CARVED environment variable to 1:
 ```
-LD_PRELOAD="$HDF5_CARVE_LIBRARY/lib/h5carve.so $HDF5_CARVE_LIBRARY/lib/libhdf5.so" USE_CARVED=1 <execution command>
+LD_PRELOAD="$HDF5_CARVE_LIBRARY/lib/h5carve.so $HDF5_CARVE_LIBRARY/lib/libhdf5.so" USE_CARVED=true <execution command>
 ```
