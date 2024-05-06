@@ -12,10 +12,11 @@ hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
 hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
 
 // Global variables to be used across function calls
-hid_t src_file_id;
-hid_t dest_file_id;
 char *use_carved;
-hid_t original_file_id;
+// File IDs are set to -1 to check if they have been set
+hid_t src_file_id = -1;
+hid_t dest_file_id = -1;
+hid_t original_file_id = -1;
 
 /* 
 	The primary function for accessing existing HDF5 files in the HDF5 library.
@@ -59,7 +60,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 		if (original_file_id == H5I_INVALID_HID) {
-			// printf("Error opening original file to be used as fallback.\n");
+			printf("Error opening original file to be used as fallback\n");
 		}
 
 		// Open carved file for re-execution mode
@@ -80,8 +81,17 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	// If file was opened previously, skeleton file has already been created. Skip first phase.
+	// If carved file already exists or file was opened previously, skeleton file has already been created. Skip first phase.
 	if (access(carved_filename, F_OK) == 0) {
+		if (dest_file_id == -1) {
+			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
+
+			if (dest_file_id == H5I_INVALID_HID) {
+				printf("Error calling original H5Fopen function when carved file already exists or file was opened previously\n");
+				return H5I_INVALID_HID;
+			}
+		}
+
     	return src_file_id;
 	}
 
