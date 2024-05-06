@@ -22,7 +22,7 @@ The system operates in two modes. The first mode is the execution mode where the
    <img alt="H5Fopen" src="https://github.com/raffayatiq/hdf5-data-carving/assets/58357644/5b644e40-b1ab-4bbc-a0d2-822c76c3d480">
    </p>
 
-   In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with "_carved", containing only the subset of data accessed by the program.
+   In the second phase, the system monitors H5Dread calls. As each H5Dread call is made, the contents of the dataset that is queried by an H5Dread call are copied to the carved file. The output is a carved version of the original HDF5 file, suffixed with ".carved", containing only the subset of data accessed by the program.
    
    <p align="center">
    <img alt="H5Dread" src="https://github.com/raffayatiq/hdf5-data-carving/assets/58357644/6a233928-d327-4ef1-bd17-c7eda3dca9a2">
@@ -59,23 +59,23 @@ Recommended OS: Ubuntu 20.04+.
    ```
    pip3 uninstall h5py
    ```
-6. Install h5py based on the newly built HDF5 source code:
+4. Install h5py based on the newly built HDF5 source code:
    ```
    HDF5_DIR=$HDF5_CARVE_LIBRARY pip3 install --no-binary=h5py h5py
    ```
-7. Install HDF5 development files and helper tools:
+5. Install HDF5 development files and helper tools:
    ```
    sudo apt install libhdf5-dev hdf5-helpers hdf5-tools
    ```
-8. Clone this repository:
+6. Clone this repository:
    ```
    git clone https://github.com/data-carving/hdf5-data-carving.git
    ``` 
-9. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
+7. In the cloned repository directory, compile the carving script using the [h5cc compile script](https://docs.hdfgroup.org/archive/support/HDF5/Tutor/compile.html):
    ```
    HDF5_CFLAGS="-fPIC" h5cc -shlib -shared H5carve_helper_functions.c H5carve.c -o h5carve.so
    ```
-10. Move the shared library file to the newly built HDF5 source code directory:
+8. Move the shared library file to the newly built HDF5 source code directory:
     ```
     mv h5carve.so $HDF5_CARVE_LIBRARY/lib
     ```
