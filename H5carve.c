@@ -54,7 +54,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	use_carved = getenv("USE_CARVED");
 
 	// Check if USE_CARVED environment variable has been set
-	if (use_carved != NULL && strcmp(use_carved, "1") == 0) {
+	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {
 		// Open original file for fallback machinery
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
@@ -142,7 +142,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	use_carved = getenv("USE_CARVED");
 
 	// Check if USE_CARVED environment variable has been set and return if it has (if it has been set, the carved file is queried by the above H5Dread call)
-	if (use_carved != NULL && strcmp(use_carved, "1") == 0) {	
+	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {	
 		return return_val;
 	}
 
