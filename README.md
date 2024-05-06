@@ -10,7 +10,7 @@ The carving mechanism is based on interposing on three HDF5 C API calls, namely 
 
 The carving mechanism also implements a fallback machinery in case a program decides to access data outside of the subset accessed in the original execution. In this case, the control flow of the HDF5 file access diverts to the original file (either locally stored or remotely stored e.g. on Amazon S3), querying the data in the original file instead of the carved file.
 
-The system operates in two modes. The first mode is the execution mode where the application is run with the original HDF5 file and the second mode is the re-execution mode where the application is run with the carved HDF5 file.
+The system operates in two modes. The first mode is the execution mode where the application is run with the original HDF5 file and the second mode is the repeat mode where the application is run with the carved HDF5 file.
 
 ### Execution mode
 
