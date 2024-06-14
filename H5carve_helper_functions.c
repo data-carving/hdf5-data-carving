@@ -168,14 +168,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
 				return dest_dataset_id;
 			}
-
-			// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
-			herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_dataset_id); // Iterate through each attribute and create a copy
-
-			if (attribute_iterate_return_val < 0) {
-				printf("Attribute iteration failed\n");
-				return attribute_iterate_return_val;
-			}
 		}
 	// If object is a group, make shallow copy of the group and recursively go down the tree
 	} else if (object_type == H5I_GROUP) {
@@ -193,15 +185,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		if (link_iterate_return_val < 0) {
 			printf("Link iteration failed\n");
 			return link_iterate_return_val;
-		}
-
-		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
-		herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_group_id); // Iterate through each attribute and create a copy
-		
-		if (attribute_iterate_return_val < 0) {
-			printf("Attribute iteration failed\n");
-			return attribute_iterate_return_val;
-		}		
+		}	
 	}
 	
 	return 0;

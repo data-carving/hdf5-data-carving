@@ -126,14 +126,6 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		printf("Link iteration failed\n");
 		return H5I_INVALID_HID;
 	}
-
-	// Iterate over attributes at root level in the source file and make non-shallow copies in the destination file
-	herr_t attribute_iterate_return_val = H5Aiterate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &destination_group_location_id);
-
-	if (attribute_iterate_return_val < 0) {
-		printf("Attribute iteration failed\n");
-		return H5I_INVALID_HID;
-	}
 	
 	return src_file_id;
 }
