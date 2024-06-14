@@ -160,24 +160,8 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
 
-	// Open dataset in the destination file
-	hid_t destination_dataset_id;
-	destination_dataset_id = H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT);
-
-	if (destination_dataset_id == H5I_INVALID_HID) {
-		printf("Error opening dataset\n");
-		return destination_dataset_id;
-	}
-
 	// Check if dataset is NULL in carved file. If it is, remove associated link and copy original dataset to carved file
-	if (is_dataset_null(destination_dataset_id)) {
-		// Delete empty copy so that we are able to make a new copy with contents populated
-		herr_t link_deletion = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
-
-		if (link_deletion < 0) {
-			printf("Link deletion failed");
-		}
-
+	if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
 		// Make copy of dataset in the destination file
 		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -199,26 +183,30 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	// Original function call
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
-	hid_t return_val = original_H5Oopen(loc_id, name, lapl_id);
+	hid_t return_val;
 
-	if (return_val == H5I_INVALID_HID) {
-		printf("Error opening object\n");
-		return return_val;
-	}
+	if (!H5Lexists(loc_id, name, H5P_DEFAULT)) {
+		// Fetch length of name of dataset
+	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
-	// Fetch type of object
-	H5I_type_t object_type = H5Iget_type(return_val);
+	    if (size_of_name_buffer == 0) {
+	    	printf("Error fetching size of dataset name buffer\n");
+	    	return -1;
+	    }
 
-	if (object_type == H5I_BADID) {
-		printf("Error fetching object type in interposed H5Oopen\n");
-		return return_val;
-	}
+	   	// Create and populate buffer for dataset name
+	    char *parent_object_name = (char *)malloc(size_of_name_buffer);
+	    H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
+	    
+	    hid_t original_file_loc_id = H5Oopen(original_file_id, parent_object_name, lapl_id);
 
-	// Only consider triggering fallback if the object is a dataset (since H5Oopen can also be used to open files, groups, and datatypes)
-	if (object_type == H5I_DATASET) {
-		// Trigger fallback if the dataset is NULL
-		if (is_dataset_null(return_val)) {
-			return_val = original_H5Oopen(original_file_id, name, lapl_id);
+	    return_val = original_H5Oopen(original_file_loc_id, name, lapl_id);
+	} else {
+		return_val = original_H5Oopen(loc_id, name, lapl_id);
+
+		if (return_val == H5I_INVALID_HID) {
+			printf("Error opening object\n");
+			return return_val;
 		}
 	}
 

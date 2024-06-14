@@ -123,54 +123,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
     const char *object_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
-	// If object is a dataset, make shallow copy of dataset and terminate
-	if (object_type == H5I_DATASET) {
-		hid_t dataset_id, data_type, data_space;
-
-		// Open the dataset
-		dataset_id = H5Dopen(src_file_id, object_name, H5P_DEFAULT);
-
-		if (dataset_id == H5I_INVALID_HID) {
-			printf("Error opening dataset\n");
-			return dataset_id;
-		}
-
-		// Fetch data type of dataset
-		data_type = H5Dget_type(dataset_id);
-
-		if (data_type == H5I_INVALID_HID) {
-			printf("Error fetching type of dataset\n");
-			return data_type;
-		}
-
-		// Create null dataspace for shallow copy
-		data_space = H5Screate(H5S_NULL);
-
-		if (data_space == H5I_INVALID_HID) {
-			printf("Error fetching data space of dataset\n");
-			return data_space;
-		}
-
-		// If dataset is "axis0", "axis1", or "block0_items", make deep copy
-		if (strcmp(name, "axis0") == 0 || strcmp(name, "axis1") == 0 || strcmp(name, "block0_items") == 0) {
-			herr_t object_copy_return_val = H5Ocopy(src_file_id, object_name, dest_file_id, object_name, H5P_DEFAULT, H5P_DEFAULT);
-
-			if (object_copy_return_val < 0) {
-	    		printf("Copying %s failed in shallow_copy_object.\n", object_name);
-	    		return object_copy_return_val;
-	    	}
-	    // Otherwise, make shallow copy of the dataset
-		} else {
-			// Create dataset in destination file
-			hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-
-			if (dest_dataset_id < 0) {
-				printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
-				return dest_dataset_id;
-			}
-		}
-	// If object is a group, make shallow copy of the group and recursively go down the tree
-	} else if (object_type == H5I_GROUP) {
+	if (object_type == H5I_GROUP) {
 		// Create group in destination file
 		hid_t dest_group_id = H5Gcreate1(*dest_parent_object_id, name, size_of_name_buffer);
 
