@@ -17,6 +17,8 @@ char *use_carved;
 hid_t src_file_id = -1;
 hid_t dest_file_id = -1;
 hid_t original_file_id = -1;
+char *is_netcdf4;
+
 
 /* 
 	The primary function for accessing existing HDF5 files in the HDF5 library.
@@ -29,6 +31,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	// Create name of carved file
 	char *carved_directory = getenv("CARVED_DIRECTORY");
+	is_netcdf4 = getenv("NETCDF4");
 	
 	char *filename_without_directory_separators = strrchr(filename, '/');
     
@@ -160,7 +163,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
 
-	// Check if dataset is NULL in carved file. If it is, remove associated link and copy original dataset to carved file
+	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
 	if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
 		// Make copy of dataset in the destination file
 		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
@@ -168,6 +171,24 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 		if (object_copy_return_val < 0) {
 			printf("Copying %s failed.\n", dataset_name);
 			return object_copy_return_val;
+		}
+
+		// Check if the file is netCDF4
+		if (is_netcdf4 != NULL) {
+			hid_t recent = H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
+
+			if (recent < 0) {
+				printf("Object open after copying failed.\n");
+				return recent;
+			}
+
+			// Delete copied attributes (attributes may contain references to objects which would be invalid in carved file)
+			herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL);
+
+			if (attribute_iterate_return_val < 0) {
+				printf("Attribute iteration failed\n");
+				return attribute_iterate_return_val;
+			}
 		}
 	}
 	
@@ -185,7 +206,11 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 	hid_t return_val;
 
-	if (!H5Lexists(loc_id, name, H5P_DEFAULT)) {
+	// Fetch USE_CARVED environment variable
+	use_carved = getenv("USE_CARVED");
+	
+	// If in repeat mode and object does not exist in carved file, bifurcate access to original file
+	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!H5Lexists(loc_id, name, H5P_DEFAULT))) {
 		// Fetch length of name of dataset
 	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
