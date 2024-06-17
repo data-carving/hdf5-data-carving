@@ -84,6 +84,15 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 	return 0;
 }
 
+herr_t delete_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+	herr_t status = H5Adelete(loc_id, name);
+
+	if (status < 0) {
+		printf("Attribute deletion failed\n");
+		return -1;
+	}
+}
+
 // Copy structure of the HDF5 without copying contents. Essentially a DFS into the directed graph structure of an HDF5 file.
 // In the directed graph structure, datasets are leaf nodes and groups are sub-trees
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
