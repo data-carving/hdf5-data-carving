@@ -1,7 +1,9 @@
 #ifndef H5CARVE_HELPER_FUNCTIONS_H
 #define H5CARVE_HELPER_FUNCTIONS_H
 
+hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id);
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
+herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 herr_t delete_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 bool is_already_recorded(char *filename);
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);

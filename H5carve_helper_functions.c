@@ -10,9 +10,112 @@ extern hid_t original_file_id;
 extern char **files_opened;
 extern files_opened_current_size;
 
+hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
+	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));
+
+	for (int i = 0; i < num_elements; i++) {
+		// Process the reference data
+	    hid_t referenced_obj = H5Rdereference1(src_attribute_id, H5R_OBJECT, (source_ref + i)); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
+
+	    if (referenced_obj < 0) {
+	        printf("Error dereferencing object.\n");
+	        return referenced_obj;
+	    }
+
+	    // Fetch length of name of dataset
+	    int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
+
+	    if (size_of_name_buffer == 0) {
+	        printf("Error fetching size of dataset name buffer\n");
+	        return -1;
+	    }
+
+	    // Create and populate buffer for dataset name
+	    char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
+	    H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
+
+	    herr_t ref_dest_creation_return_value = H5Rcreate((dest_ref + i), dest_file_id, referenced_obj_name, H5R_OBJECT, -1);
+
+	    if (ref_dest_creation_return_value < 0) {
+	        printf("Error creating destination file reference.\n");
+	        return ref_dest_creation_return_value;
+	    }
+	}
+    
+	return dest_ref;
+}
+
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+	// Open the object
+	hid_t object_id = H5Oopen(loc_id, name, H5P_DEFAULT);
+
+	if (object_id < 0) {
+		printf("Error opening object\n");
+		return object_id;
+	}
+
+	// Fetch id of parent object
+	hid_t *dest_parent_object_id = *(hid_t *)opdata;
+	
+	if (dest_parent_object_id == NULL) {
+		printf("Error due to NULL destination file parent object\n");
+		return -1;
+	}
+
+	// Fetch object type
+	H5I_type_t object_type = H5Iget_type(object_id);
+
+	if (object_type == H5I_BADID) {
+		printf("Error fetching type of identifier\n");
+		return object_type;
+	}
+
+	if (object_type == H5I_DATASET) {
+		hid_t dest_object_id = H5Dopen(dest_parent_object_id, name, H5P_DEFAULT);
+
+		if (dest_object_id < 0) {
+			printf("Error opening dest object\n");
+			return object_id;
+		}
+
+		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
+		herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &dest_object_id); // Iterate through each attribute and create a copy
+		
+		if (attribute_iterate_return_val < 0) {
+			printf("Attribute iteration failed\n");
+			return attribute_iterate_return_val;
+		}
+	} else if (object_type == H5I_GROUP) {
+		hid_t dest_object_id = H5Oopen(dest_parent_object_id, name, H5P_DEFAULT);
+
+		if (dest_object_id < 0) {
+			printf("Error opening dest object\n");
+			return object_id;
+		}
+
+		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
+		herr_t attribute_iterate_return_val = H5Aiterate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &dest_object_id); // Iterate through each attribute and create a copy
+		
+		if (attribute_iterate_return_val < 0) {
+			printf("Attribute iteration failed\n");
+			return attribute_iterate_return_val;
+		}
+
+		// Iterate over objects at this level in the source file, and make shallow copes in the destination file
+		herr_t link_iterate_return_val = H5Literate2(object_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &dest_object_id);
+
+		if (link_iterate_return_val < 0) {
+			printf("Link iteration failed\n");
+			return link_iterate_return_val;
+		}
+	}
+
+	return 0;
+}
+
+herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
-	hid_t *dest_object_id = (hid_t *)opdata;
+	hid_t *dest_object_id = *(hid_t *)opdata;
 
 	if (dest_object_id == NULL) {
 		return -1;
@@ -33,7 +136,6 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		printf("Error fetching attribute name\n");
 		return size_of_name_buffer;
 	}
-
 	// Create and populate buffer for attribute name
 	char *name_of_attribute = (char *)malloc(size_of_name_buffer);
 	H5Aget_name(src_attribute_id, size_of_name_buffer, name_of_attribute);
@@ -46,43 +148,97 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		return attribute_data_type;
 	}
 
-	// Fetch data space of attribute
-	attribute_data_space = H5Aget_space(src_attribute_id);
+	// printf("%s\n", name_of_attribute);
 
-	if (attribute_data_space < 0) {
-		printf("Error fetching attribute data space\n");
-		return attribute_data_space;
-	}
+	// Check if attribute_data_type is a REFERENCE datatype
+    if (H5Tget_class(attribute_data_type) == H5T_REFERENCE) {
+	    // Get the number of elements in the reference attribute
+	    hsize_t num_elements = H5Aget_storage_size(src_attribute_id) / sizeof(hobj_ref_t);
 
-	// Fetch data size of attribute
-	hsize_t attribute_data_size = H5Aget_storage_size(src_attribute_id);
+	    if (num_elements == 0) {
+	        printf("Error getting attribute storage size\n");
+	        return -1;
+	    }
+	    // printf("Number of elements %d\n", num_elements);
+	    // Allocate memory to store the reference data
+	    // hobj_ref_t ref_data_src_file = malloc(num_elements * sizeof(hobj_ref_t));
+	    hobj_ref_t *ref_data_src_file = malloc(num_elements * sizeof(hobj_ref_t));
 
-	// Create and populate buffer for attribute data
-	void* attribute_data_buffer = malloc(attribute_data_size);
-	herr_t read_return_val = H5Aread(src_attribute_id, attribute_data_type, attribute_data_buffer);
+	    // Read the reference attribute into the allocated memory
+	    herr_t read_return_val = H5Aread(src_attribute_id, H5T_STD_REF_OBJ, ref_data_src_file);
 
-	if (read_return_val < 0) {
-		printf("Error reading attribute data\n");
-		return read_return_val;
-	}
+	    if (read_return_val < 0) {
+	        printf("Error reading attribute.\n");
+	        return read_return_val;
+	    }
 
-	// Create attribute in destination file
-	dest_attribute_id = H5Acreate1(*dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
-	
-	if (dest_attribute_id < 0) {
-		printf("Error creating attribute\n");
-		return dest_attribute_id;
-	}
+	    // Currently, supports only object references, and not dataset region references
+	    if (H5Tequal(attribute_data_type, H5T_STD_REF_OBJ)) {
+	        hobj_ref_t *ref_data_dest = copy_reference_object(ref_data_src_file, num_elements, src_attribute_id);
 
-	// Write attribute data to the newly created attribute in destination file
-	herr_t write_return_val = H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
+	        // Copy the dataspace
+	        hid_t ref_data_dest_dataspace = H5Aget_space(src_attribute_id);   
+	        if (ref_data_dest_dataspace < 0) {
+	            printf("Error copying dataspace\n");
+	            return -1;
+	        }
 
-	if (write_return_val < 0) {
-		printf("Error writing attribute\n");
-		return write_return_val;
-	}
+	        // Create the attribute and write the reference
+	        hid_t attr_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
 
-	free(name_of_attribute);
+	        if (attr_id < 0) {
+	            printf("Error creating destination file attribute.\n");
+	            return -1;
+	        }
+
+	        herr_t status = H5Awrite(attr_id, H5T_STD_REF_OBJ, ref_data_dest);
+	        if (status < 0) {
+	            printf("Error writing reference to attribute\n");
+	            return -1;
+	        }
+	    } else if (H5Tequal(attribute_data_type, H5T_STD_REF_DSETREG)) {
+	        // TODO: Add support for dataset region references
+	        printf("Dataset region references not supported yet.\n");
+	        return -1;
+	    }
+    } else {
+    	// Fetch data space of attribute
+		attribute_data_space = H5Aget_space(src_attribute_id);
+
+		if (attribute_data_space < 0) {
+			printf("Error fetching attribute data space\n");
+			return attribute_data_space;
+		}
+
+		// Fetch data size of attribute
+		hsize_t attribute_data_size = H5Aget_storage_size(src_attribute_id);
+
+		// Create and populate buffer for attribute data
+		void* attribute_data_buffer = malloc(attribute_data_size);
+		herr_t read_return_val = H5Aread(src_attribute_id, attribute_data_type, attribute_data_buffer);
+
+		if (read_return_val < 0) {
+			printf("Error reading attribute data\n");
+			return read_return_val;
+		}
+
+		// Create attribute in destination file
+		dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+		
+		if (dest_attribute_id < 0) {
+			printf("Error creating attribute\n");
+			return dest_attribute_id;
+		}
+
+		// Write attribute data to the newly created attribute in destination file
+		herr_t write_return_val = H5Awrite(dest_attribute_id, attribute_data_type, attribute_data_buffer);
+
+		if (write_return_val < 0) {
+			printf("Error writing attribute\n");
+			return write_return_val;
+		}
+    }
+
 	return 0;
 }
 
