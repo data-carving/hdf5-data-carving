@@ -18,7 +18,7 @@ char *use_carved;
 hid_t src_file_id = -1;
 hid_t dest_file_id = -1;
 hid_t original_file_id = -1;
-char *is_netcdf4;
+char *is_netcdf4; // TODO: replace with an robust automatic check i.e. some kind of byte encoding 
 char **files_opened = NULL;
 int files_opened_current_size = 0;
 
@@ -263,22 +263,19 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 			return object_copy_return_val;
 		}
 
-		// Check if the file is netCDF4
-		if (is_netcdf4 != NULL) {
-			hid_t recent = H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
+		hid_t recent = H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
-			if (recent < 0) {
-				printf("Object open after copying failed.\n");
-				return recent;
-			}
+		if (recent < 0) {
+			printf("Object open after copying failed.\n");
+			return recent;
+		}
 
-			// Delete copied attributes (attributes may contain references to objects which would be invalid in carved file)
-			herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL);
+		// Delete copied attributes (attributes may contain references to objects which would be invalid in carved file)
+		herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL);
 
-			if (attribute_iterate_return_val < 0) {
-				printf("Attribute iteration failed\n");
-				return attribute_iterate_return_val;
-			}
+		if (attribute_iterate_return_val < 0) {
+			printf("Attribute iteration failed\n");
+			return attribute_iterate_return_val;
 		}
 	}
 	
@@ -326,4 +323,36 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	}
 
 	return return_val;
+}
+
+void H5_term_library(void) {
+	for (int i = 0; i < files_opened_current_size; i++) {
+		src_file_id = original_H5Fopen(files_opened[i], H5F_ACC_RDONLY, H5P_DEFAULT);
+		char *carved_filename = malloc(strlen(files_opened[i]) + 7 + 1);
+		strcpy(carved_filename, files_opened[i]);
+		strcat(carved_filename, ".carved");
+		dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
+
+		hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);		
+		hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+
+		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
+		herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
+		
+		if (attribute_iterate_return_val < 0) {
+			printf("Attribute iteration failed\n");
+			return attribute_iterate_return_val;
+		}
+
+		// Start DFS to make a copy of attributes
+		herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
+
+		if (link_iterate_return_val < 0) {
+			printf("Link iteration failed\n");
+			return H5I_INVALID_HID;
+		}
+	}
+
+	original_H5_term_library = dlsym(RTLD_NEXT, "H5_term_library");
+	original_H5_term_library();
 }
