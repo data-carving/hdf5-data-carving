@@ -3,6 +3,7 @@
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 herr_t delete_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
+bool is_already_recorded(char *filename);
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 char *get_carved_filename(const char *filename);

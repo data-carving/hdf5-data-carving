@@ -7,6 +7,8 @@ extern hid_t src_file_id;
 extern hid_t dest_file_id;
 extern char *use_precarved;
 extern hid_t original_file_id;
+extern char **files_opened;
+extern files_opened_current_size;
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
@@ -199,4 +201,14 @@ bool is_dataset_null(hid_t dataset_id) {
 
 	// If dataspace class is NULL, it means the dataset is empty. 
 	return dataspace_class == H5S_NULL;
+}
+
+bool is_already_recorded(char *filename) {
+	for (int i = 0; i < files_opened_current_size; i++) {
+		if (strcmp(files_opened[i], filename) == 0) {
+			return true;
+		}
+	}
+
+	return false;
 }

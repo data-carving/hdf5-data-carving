@@ -10,6 +10,7 @@
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
 hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
+void (*original_H5_term_library)(void);
 
 // Global variables to be used across function calls
 char *use_carved;
@@ -18,7 +19,8 @@ hid_t src_file_id = -1;
 hid_t dest_file_id = -1;
 hid_t original_file_id = -1;
 char *is_netcdf4;
-
+char **files_opened = NULL;
+int files_opened_current_size = 0;
 
 /* 
 	The primary function for accessing existing HDF5 files in the HDF5 library.
@@ -96,6 +98,20 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		}
 
     	return src_file_id;
+	}
+
+	if (!is_already_recorded(filename)) {
+		// Record files that have been opened for copying attributes
+		if (files_opened == NULL) {
+	        files_opened = malloc((files_opened_current_size + 1) * sizeof(char*));
+	    } else {
+	        files_opened = realloc(files_opened, (files_opened_current_size + 1) * sizeof(char*));
+	    }
+	    
+	    files_opened[files_opened_current_size] = malloc(sizeof(char) * (strlen(filename) + 1));
+	    strcpy(files_opened[files_opened_current_size], filename);
+
+	    files_opened_current_size += 1;
 	}
 
 	// Open root group of source file
@@ -208,6 +224,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 				        char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
 				        H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
 
+				        // Make copy of referenced dataset if it doesn't exist in the carved file
 				        if (!H5Lexists(dest_file_id, referenced_obj_name, H5P_DEFAULT)) {
 							// Make copy of dataset in the destination file
 							herr_t object_copy_return_val = H5Ocopy(src_file_id, referenced_obj_name, dest_file_id, referenced_obj_name, H5P_DEFAULT, H5P_DEFAULT);
