@@ -45,6 +45,34 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	return dest_ref;
 }
 
+void copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t data_type, int num_elements, int num_members, size_t starting_offset) {
+    for (hsize_t j = 0; j < num_elements; j++) {
+		for (int i = 0; i < num_members; i++) {
+			char *field_name = H5Tget_member_name(data_type, i);
+    		size_t field_offset = H5Tget_member_offset(data_type, i);
+    		hid_t field_type = H5Tget_member_type(data_type, i);
+
+    		size_t offset = starting_offset + field_offset;
+
+    		if (H5Tget_class(field_type) == H5T_REFERENCE) {
+    			// TODO add check for REF_OBJ and DSET_REGION
+        		hobj_ref_t *ref_data_dest = copy_reference_object(src_buffer + offset, 1, src_id);
+
+		        H5Tinsert(data_type, field_name, offset, field_type);
+				memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
+    		} else if(H5Tget_class(field_type) == H5T_COMPOUND) {
+				int nested_num_members = H5Tget_nmembers(field_type);
+
+    			copy_compound_type(src_id, src_buffer, dest_buffer, field_type, 1, nested_num_members, offset);
+    		} else {
+    			H5Tinsert(data_type, field_name, offset, field_type);
+    			char *value = (char *)src_buffer + offset;
+				memcpy(dest_buffer + offset, value, H5Tget_size(field_type));
+    		}
+		}
+	}
+}
+
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	// Open the object
 	hid_t object_id = H5Oopen(loc_id, name, H5P_DEFAULT);
@@ -148,8 +176,6 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 		return attribute_data_type;
 	}
 
-	// printf("%s\n", name_of_attribute);
-
 	// Check if attribute_data_type is a REFERENCE datatype
     if (H5Tget_class(attribute_data_type) == H5T_REFERENCE) {
 	    // Get the number of elements in the reference attribute
@@ -159,9 +185,8 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	        printf("Error getting attribute storage size\n");
 	        return -1;
 	    }
-	    // printf("Number of elements %d\n", num_elements);
+	    
 	    // Allocate memory to store the reference data
-	    // hobj_ref_t ref_data_src_file = malloc(num_elements * sizeof(hobj_ref_t));
 	    hobj_ref_t *ref_data_src_file = malloc(num_elements * sizeof(hobj_ref_t));
 
 	    // Read the reference attribute into the allocated memory
@@ -201,6 +226,44 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	        printf("Dataset region references not supported yet.\n");
 	        return -1;
 	    }
+    } else if (H5Tget_class(attribute_data_type) == H5T_COMPOUND) {
+    	// Fetch data space of attribute
+		attribute_data_space = H5Aget_space(src_attribute_id);
+
+		// Get the size of the compound datatype
+	    size_t size = H5Tget_size(attribute_data_type);
+	    
+		hsize_t num_points;
+	    H5Sget_simple_extent_dims(attribute_data_space, &num_points, NULL);
+
+	    // Allocate buffer to read the attribute
+	    void *src_buffer = malloc(size * num_points);
+
+	    // Read the attribute data
+	    herr_t status = H5Aread(src_attribute_id, attribute_data_type, src_buffer);
+
+	    hid_t dest_attribute_type = H5Tcreate(H5T_COMPOUND, size);
+
+	    // Allocate buffer to read the attribute
+	    void *dest_buffer = malloc(size * num_points);
+
+    	int num_members = H5Tget_nmembers(attribute_data_type);
+
+        copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
+
+	    hid_t dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+
+	    if (dest_attribute_id < 0) {
+			printf("Error creating attribute\n");
+			return dest_attribute_id;
+		}
+
+	    herr_t write_return_val = H5Awrite(dest_attribute_id, attribute_data_type, dest_buffer);
+
+	    if (write_return_val < 0) {
+			printf("Error writing attribute\n");
+			return write_return_val;
+		}
     } else {
     	// Fetch data space of attribute
 		attribute_data_space = H5Aget_space(src_attribute_id);
