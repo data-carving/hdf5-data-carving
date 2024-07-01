@@ -70,6 +70,8 @@ void copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t
 				memcpy(dest_buffer + offset, value, H5Tget_size(field_type));
     		}
 		}
+
+    	starting_offset += (H5Tget_size(data_type));
 	}
 }
 
@@ -264,6 +266,65 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 			printf("Error writing attribute\n");
 			return write_return_val;
 		}
+    } else if (H5Tget_class(attribute_data_type) == H5T_VLEN) {
+    	// Fetch data space of attribute
+		attribute_data_space = H5Aget_space(src_attribute_id);
+
+		hsize_t dims[1];
+		H5Sget_simple_extent_dims(attribute_data_space, dims, NULL);
+
+		hvl_t *rdata = (hvl_t *)malloc(dims[0] * sizeof(hvl_t));
+
+		herr_t status = H5Aread(src_attribute_id, attribute_data_type, rdata);
+
+		// Create the VLEN datatype
+    	hid_t dest_vlen = H5Tvlen_create(H5Tget_super(attribute_data_type));
+
+		hid_t dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT, H5P_DEFAULT);
+
+		hvl_t dest_data[dims[0]];
+
+		if (H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_REFERENCE) {
+    		if (H5Tequal(H5Tget_super(attribute_data_type), H5T_STD_REF_OBJ)) {
+    			// Process the VLEN data
+			    for (int i = 0; i < dims[0]; i++) {
+				    dest_data[i].len = rdata[i].len;
+				 	dest_data[i].p = copy_reference_object(rdata[i].p, rdata[i].len, src_attribute_id);   
+			    }
+    		} else if (H5Tequal(H5Tget_super(attribute_data_type), H5T_STD_REF_DSETREG)) {
+    			// TODO: Add support for dataset region references
+	        	printf("Dataset region references not supported yet.\n");
+	        	return -1;
+    		}
+    	} else if (H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_COMPOUND) {
+    		for (int i = 0; i < dims[0]; i++) {
+    			dest_data[i].len = rdata[i].len;
+    			// Get the size of the compound datatype
+		    	size_t size = H5Tget_size(H5Tget_super(attribute_data_type));
+
+		    	hsize_t num_points = rdata[i].len;
+		    	dest_data[i].p = malloc(size * num_points);
+
+		    	hid_t vlen_element_data_type = H5Tget_super(attribute_data_type);
+	    		int num_members = H5Tget_nmembers(vlen_element_data_type);
+	    		copy_compound_type(src_attribute_id, rdata[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
+    		}
+    	} else {
+    		// Process the VLEN data
+		    for (int i = 0; i < dims[0]; i++) {
+		        for (int j = 0; j < rdata[i].len; j++) {
+		            dest_data[i].len = rdata[i].len;
+		            dest_data[i].p = rdata[i].p;
+		        }
+		    }
+    	}
+
+	    herr_t write_status = H5Awrite(dest_attribute_id, attribute_data_type, dest_data);
+	    
+	    if (write_status < 0) {	
+	        printf("Error writing attribute\n");
+	        return write_status;
+	    }
     } else {
     	// Fetch data space of attribute
 		attribute_data_space = H5Aget_space(src_attribute_id);
