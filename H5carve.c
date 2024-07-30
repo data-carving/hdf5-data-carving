@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "hdf5.h"
+#include "netcdf.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
 hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
+int (*original_nc_open)(const char *path, int omode, int *ncidp);
 void (*original_H5_term_library)(void);
 
 // Global variables to be used across function calls
@@ -22,18 +24,14 @@ char *is_netcdf4; // TODO: replace with an robust automatic check i.e. some kind
 char **files_opened = NULL;
 int files_opened_current_size = 0;
 
-/* 
-	The primary function for accessing existing HDF5 files in the HDF5 library.
-	Additional functionality added includes making an identical skeleton copy of the existing HDF5 file.
-	The copy includes all groups, datasets, and attributes but excludes the contents of the datasets.
-*/
-hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
-	// Fetch original function
-	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
+int nc_open(const char *path, int omode, int *ncidp) {
+	original_nc_open = dlsym(RTLD_NEXT, "nc_open");
+
+	char *filename = malloc(strlen(path));
+	strcpy(filename, path);
 
 	// Create name of carved file
 	char *carved_directory = getenv("CARVED_DIRECTORY");
-	is_netcdf4 = getenv("NETCDF4");
 	
 	char *filename_without_directory_separators = strrchr(filename, '/');
     
@@ -55,9 +53,60 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		strcat(carved_filename, filename_without_directory_separators);
 		strcat(carved_filename, ".carved");
 	}
-	printf("%s\n", filename);
+	
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
+
+	// Check if USE_CARVED environment variable has been set
+	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {
+		return original_nc_open(carved_filename, omode, ncidp);
+	}
+
+	return original_nc_open(path, omode, ncidp);
+}
+
+/* 
+	The primary function for accessing existing HDF5 files in the HDF5 library.
+	Additional functionality added includes making an identical skeleton copy of the existing HDF5 file.
+	The copy includes all groups, datasets, and attributes but excludes the contents of the datasets.
+*/
+hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
+	// Fetch original function
+	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
+
+	// Create name of carved file
+	char *carved_directory = getenv("CARVED_DIRECTORY");
+	is_netcdf4 = getenv("NETCDF4");
+	// Fetch USE_CARVED environment variable
+	use_carved = getenv("USE_CARVED");
+
+	if (is_netcdf4 != NULL && use_carved != NULL) {
+		char *filename_copy = malloc(strlen(filename));
+		strcpy(filename_copy, filename);
+		filename_copy[strlen(filename_copy) - 7] = '\0';
+		filename = filename_copy;
+	}
+
+	char *filename_without_directory_separators = strrchr(filename, '/');
+    
+    if (filename_without_directory_separators != NULL) {
+            filename_without_directory_separators = filename_without_directory_separators + 1;
+    } else {
+            filename_without_directory_separators = filename;
+    }
+
+	char carved_filename[(carved_directory == NULL ? strlen(filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
+
+	if (carved_directory == NULL) {
+	    carved_filename[0] = '\0';
+		strcat(carved_filename, filename);
+		strcat(carved_filename, ".carved");	
+	} else {
+		carved_filename[0] = '\0';
+		strcat(carved_filename, carved_directory);
+		strcat(carved_filename, filename_without_directory_separators);
+		strcat(carved_filename, ".carved");
+	}
 
 	// Check if USE_CARVED environment variable has been set
 	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {
@@ -65,7 +114,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 		if (original_file_id == H5I_INVALID_HID) {
-			// printf("Error opening original file to be used as fallback\n");
+			printf("Error opening original file to be used as fallback\n");
 		}
 
 		// Open carved file for re-execution mode
@@ -299,13 +348,12 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	// Original function call
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 	hid_t return_val;
-
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 	
 	// If in repeat mode and object does not exist in carved file, bifurcate access to original file
 	// if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!H5Lexists(loc_id, name, H5P_DEFAULT))) {
-	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!does_dataset_exist(loc_id))) {
+	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!does_dataset_exist(H5Dopen(src_file_id, name, H5P_DEFAULT)))) {
 		// Fetch length of name of dataset
 	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
@@ -318,7 +366,7 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	    char *parent_object_name = (char *)malloc(size_of_name_buffer);
 	    H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
 	    
-	    hid_t original_file_loc_id = H5Oopen(original_file_id, parent_object_name, lapl_id);
+	    hid_t original_file_loc_id = original_H5Oopen(original_file_id, parent_object_name, lapl_id);
 
 	    return_val = original_H5Oopen(original_file_loc_id, name, lapl_id);
 	} else {

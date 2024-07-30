@@ -569,7 +569,7 @@ bool does_dataset_exist(hid_t dataset_id) {
 	if (!H5Aexists(dataset_id, "IS_EMPTY")) {
 		return true;
 	}
-	printf("%d\n", dataset_id);
+
 	hid_t attr_id = H5Aopen(dataset_id, "IS_EMPTY", H5P_DEFAULT);
 
 	if (attr_id < 0) {
