@@ -1,7 +1,11 @@
+#define _GNU_SOURCE
 #include "hdf5.h"
 #include "H5carve_helper_functions.h"
 #include <stdlib.h>
 #include <string.h>
+#include <dlfcn.h>
+
+herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
 
 extern hid_t src_file_id;
 extern hid_t dest_file_id;
@@ -421,7 +425,55 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
     const char *object_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
-	if (object_type == H5I_GROUP) {
+	// If object is a dataset, make shallow copy of dataset and terminate
+	if (object_type == H5I_DATASET) {
+		// printf("Creating shallow copy of dataset %s\n", name);
+
+		hid_t dataset_id, data_type, data_space;
+
+		// Open the dataset
+		dataset_id = H5Dopen(src_file_id, object_name, H5P_DEFAULT);
+
+		if (dataset_id == H5I_INVALID_HID) {
+			printf("Error opening dataset\n");
+			return dataset_id;
+		}
+
+		// Fetch data type of dataset
+		data_type = H5Dget_type(dataset_id);
+
+		if (data_type == H5I_INVALID_HID) {
+			printf("Error fetching type of dataset\n");
+			return data_type;
+		}
+
+		// Create null dataspace for shallow copy
+		data_space = H5Dget_space(dataset_id);
+
+		if (data_space == H5I_INVALID_HID) {
+			printf("Error fetching data space of dataset\n");
+			return data_space;
+		}
+
+		// Create dataset in destination file
+		hid_t dest_dataset_id = H5Dcreate(*dest_parent_object_id, object_name, data_type, data_space, H5P_DEFAULT, H5Dget_create_plist(dataset_id), H5P_DEFAULT);
+
+		if (dest_dataset_id < 0) {
+			printf("Error creating shallow copy of dataset %s. dest_parent_object_id is %d\n", name, *dest_parent_object_id);
+			return dest_dataset_id;
+		}
+
+		// Create a scalar dataspace for the attribute.
+	    hid_t attr_dataspace_id = H5Screate(H5S_SCALAR);
+
+	    // Create an attribute to indicate that the dataset is empty.
+	    hid_t attr_id = H5Acreate2(dest_dataset_id, "IS_EMPTY", H5T_NATIVE_HBOOL, attr_dataspace_id, 
+	                               H5P_DEFAULT, H5P_DEFAULT);
+
+	    hbool_t is_empty = true;
+	    H5Awrite(attr_id, H5T_NATIVE_HBOOL, &is_empty);
+	// If object is a group, make shallow copy of the group and recursively go down the tree
+	} else if (object_type == H5I_GROUP) {
 		// Create group in destination file
 		hid_t dest_group_id = H5Gcreate1(*dest_parent_object_id, name, size_of_name_buffer);
 
@@ -469,25 +521,72 @@ char *get_carved_filename(const char *filename) {
 	return carved_filename;
 }
 
-
-bool is_dataset_null(hid_t dataset_id) {
+bool does_dataset_exist(hid_t dataset_id) {
 	// Retrives the dataspace of dataset
-	hid_t dataspace = H5Dget_space(dataset_id);
+	// hid_t dataspace = H5Dget_space(dataset_id);
 
-	if (dataspace == H5I_INVALID_HID) {
-		printf("Error getting destination dataspace\n");
-		return dataspace;
+	// if (dataspace == H5I_INVALID_HID) {
+	// 	printf("Error getting destination dataspace\n");
+	// 	return dataspace;
+	// }
+
+	// hid_t datatype = H5Dget_type(dataset_id);
+
+	// if (datatype == H5I_INVALID_HID) {
+	// 	printf("Error getting destination datatype\n");
+	// 	return datatype;
+	// }
+
+	// H5S_class_t dataspace_class = H5Sget_simple_extent_type(dataspace);
+
+	// if (dataspace_class == H5S_NO_CLASS) {
+	// 	printf("Error getting destination dataspace class\n");
+	// 	return dataspace_class;
+	// }
+
+	// hid_t plist_id = H5Dget_create_plist(dataset_id);
+
+	// void *fill_value = malloc(H5Tget_size(datatype));
+
+	// H5Pget_fill_value(plist_id, datatype, fill_value);
+	// int rank = H5Sget_simple_extent_ndims(dataspace);
+
+	// printf("%d\n", rank);
+
+	// // If dataspace class is NULL, it means the dataset is empty. 
+	// if (dataspace_class == H5S_SCALAR) {
+	// 	int scalar_value;
+	// 	hid_t datatype_id = H5Dget_type(dataset_id);
+
+	// 	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
+	// 	original_H5Dread(dataset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &scalar_value);
+
+	// 	if (scalar_value == 0) {
+	// 		return false;
+	// 	}
+	// }
+
+	if (!H5Aexists(dataset_id, "IS_EMPTY")) {
+		return true;
+	}
+	printf("%d\n", dataset_id);
+	hid_t attr_id = H5Aopen(dataset_id, "IS_EMPTY", H5P_DEFAULT);
+
+	if (attr_id < 0) {
+		printf("Error opening IS_EMPTY attribute\n");
+		return attr_id;
 	}
 
-	H5S_class_t dataspace_class = H5Sget_simple_extent_type(dataspace);
+	hbool_t is_empty;
 
-	if (dataspace_class == H5S_NO_CLASS) {
-		printf("Error getting destination dataspace class\n");
-		return dataspace_class;
+	herr_t attribute_read_ret = H5Aread(attr_id, H5T_NATIVE_UINT8, &is_empty);
+
+	if (attribute_read_ret < 0) {
+		printf("Error reading IS_EMPTY attribute\n");
+		return attribute_read_ret;
 	}
 
-	// If dataspace class is NULL, it means the dataset is empty. 
-	return dataspace_class == H5S_NULL;
+	return !(is_empty == true);
 }
 
 bool is_already_recorded(char *filename) {

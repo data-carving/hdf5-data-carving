@@ -55,7 +55,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		strcat(carved_filename, filename_without_directory_separators);
 		strcat(carved_filename, ".carved");
 	}
-	
+	printf("%s\n", filename);
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
@@ -180,7 +180,11 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
 
 	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
-	if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
+
+	// if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
+    if (!does_dataset_exist(H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT))) {
+    	H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
+
 		if (is_netcdf4 != NULL) {
 			hid_t reference_list_attribute = H5Aopen_by_name(src_file_id, dataset_name, "DIMENSION_LIST", H5P_DEFAULT, H5P_DEFAULT);
 
@@ -225,7 +229,10 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 				        H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
 
 				        // Make copy of referenced dataset if it doesn't exist in the carved file
-				        if (!H5Lexists(dest_file_id, referenced_obj_name, H5P_DEFAULT)) {
+				        // if (!H5Lexists(dest_file_id, referenced_obj_name, H5P_DEFAULT)) {
+				        if (!does_dataset_exist(H5Dopen(dest_file_id, referenced_obj_name, H5P_DEFAULT))) {
+    						H5Ldelete(dest_file_id, referenced_obj_name, H5P_DEFAULT);
+
 							// Make copy of dataset in the destination file
 							herr_t object_copy_return_val = H5Ocopy(src_file_id, referenced_obj_name, dest_file_id, referenced_obj_name, H5P_DEFAULT, H5P_DEFAULT);
 
@@ -297,7 +304,8 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	use_carved = getenv("USE_CARVED");
 	
 	// If in repeat mode and object does not exist in carved file, bifurcate access to original file
-	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!H5Lexists(loc_id, name, H5P_DEFAULT))) {
+	// if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!H5Lexists(loc_id, name, H5P_DEFAULT))) {
+	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!does_dataset_exist(loc_id))) {
 		// Fetch length of name of dataset
 	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
@@ -326,30 +334,36 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 }
 
 void H5_term_library(void) {
-	for (int i = 0; i < files_opened_current_size; i++) {
-		src_file_id = original_H5Fopen(files_opened[i], H5F_ACC_RDONLY, H5P_DEFAULT);
-		char *carved_filename = malloc(strlen(files_opened[i]) + 7 + 1);
-		strcpy(carved_filename, files_opened[i]);
-		strcat(carved_filename, ".carved");
-		dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
+	// Fetch USE_CARVED environment variable
+	use_carved = getenv("USE_CARVED");
 
-		hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);		
-		hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+	// Check if USE_CARVED environment variable has been set
+	if (use_carved == NULL) {
+		for (int i = 0; i < files_opened_current_size; i++) {
+			src_file_id = original_H5Fopen(files_opened[i], H5F_ACC_RDONLY, H5P_DEFAULT);
+			char *carved_filename = malloc(strlen(files_opened[i]) + 7 + 1);
+			strcpy(carved_filename, files_opened[i]);
+			strcat(carved_filename, ".carved");
+			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
-		// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
-		herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
-		
-		if (attribute_iterate_return_val < 0) {
-			printf("Attribute iteration failed\n");
-			return attribute_iterate_return_val;
-		}
+			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);		
+			hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
 
-		// Start DFS to make a copy of attributes
-		herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
+			// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
+			herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
+			
+			if (attribute_iterate_return_val < 0) {
+				printf("Attribute iteration failed\n");
+				return attribute_iterate_return_val;
+			}
 
-		if (link_iterate_return_val < 0) {
-			printf("Link iteration failed\n");
-			return H5I_INVALID_HID;
+			// Start DFS to make a copy of attributes
+			herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
+
+			if (link_iterate_return_val < 0) {
+				printf("Link iteration failed\n");
+				return H5I_INVALID_HID;
+			}
 		}
 	}
 
