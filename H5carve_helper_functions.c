@@ -467,7 +467,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	    hid_t attr_dataspace_id = H5Screate(H5S_SCALAR);
 
 	    // Create an attribute to indicate that the dataset is empty.
-	    hid_t attr_id = H5Acreate2(dest_dataset_id, "IS_EMPTY", H5T_NATIVE_HBOOL, attr_dataspace_id, 
+	    hid_t attr_id = H5Acreate2(dest_dataset_id, "CARVED_DATASET_IS_EMPTY", H5T_NATIVE_HBOOL, attr_dataspace_id, 
 	                               H5P_DEFAULT, H5P_DEFAULT);
 
 	    hbool_t is_empty = true;
@@ -566,14 +566,14 @@ bool does_dataset_exist(hid_t dataset_id) {
 	// 	}
 	// }
 
-	if (!H5Aexists(dataset_id, "IS_EMPTY")) {
+	if (!H5Aexists(dataset_id, "CARVED_DATASET_IS_EMPTY")) {
 		return true;
 	}
 
-	hid_t attr_id = H5Aopen(dataset_id, "IS_EMPTY", H5P_DEFAULT);
+	hid_t attr_id = H5Aopen(dataset_id, "CARVED_DATASET_IS_EMPTY", H5P_DEFAULT);
 
 	if (attr_id < 0) {
-		printf("Error opening IS_EMPTY attribute\n");
+		printf("Error opening CARVED_DATASET_IS_EMPTY attribute\n");
 		return attr_id;
 	}
 
@@ -582,7 +582,7 @@ bool does_dataset_exist(hid_t dataset_id) {
 	herr_t attribute_read_ret = H5Aread(attr_id, H5T_NATIVE_UINT8, &is_empty);
 
 	if (attribute_read_ret < 0) {
-		printf("Error reading IS_EMPTY attribute\n");
+		printf("Error reading CARVED_DATASET_IS_EMPTY attribute\n");
 		return attribute_read_ret;
 	}
 

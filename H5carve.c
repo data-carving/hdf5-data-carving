@@ -234,82 +234,82 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     if (!does_dataset_exist(H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT))) {
     	H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
 
-		if (is_netcdf4 != NULL) {
-			hid_t reference_list_attribute = H5Aopen_by_name(src_file_id, dataset_name, "DIMENSION_LIST", H5P_DEFAULT, H5P_DEFAULT);
+		// if (is_netcdf4 != NULL) {
+		// 	hid_t reference_list_attribute = H5Aopen_by_name(src_file_id, dataset_name, "DIMENSION_LIST", H5P_DEFAULT, H5P_DEFAULT);
 
-			if (reference_list_attribute > 0) {
-				// Fetch data space of attribute
-				hid_t attribute_data_space = H5Aget_space(reference_list_attribute);
+		// 	if (reference_list_attribute > 0) {
+		// 		// Fetch data space of attribute
+		// 		hid_t attribute_data_space = H5Aget_space(reference_list_attribute);
 
-				// Fetch data type of attribute
-				hid_t attribute_data_type = H5Aget_type(reference_list_attribute);
+		// 		// Fetch data type of attribute
+		// 		hid_t attribute_data_type = H5Aget_type(reference_list_attribute);
 
-				// Fetch dimensions of dataspace
-				hsize_t dims[1];
-				H5Sget_simple_extent_dims(attribute_data_space, dims, NULL);
+		// 		// Fetch dimensions of dataspace
+		// 		hsize_t dims[1];
+		// 		H5Sget_simple_extent_dims(attribute_data_space, dims, NULL);
 
-				// Allocate memory for attribute data buffer
-				hvl_t *attribute_data = (hvl_t *) malloc(dims[0] * sizeof(hvl_t));
+		// 		// Allocate memory for attribute data buffer
+		// 		hvl_t *attribute_data = (hvl_t *) malloc(dims[0] * sizeof(hvl_t));
 
-				// Read attribute
-				herr_t status = H5Aread(reference_list_attribute, attribute_data_type, attribute_data);
+		// 		// Read attribute
+		// 		herr_t status = H5Aread(reference_list_attribute, attribute_data_type, attribute_data);
 
-				// Process attribute data
-			    for (int i = 0; i < dims[0]; i++) {
-			        for (int j = 0; j < attribute_data[i].len; j++) {
-			            // Process the reference data
-				        hid_t referenced_obj = H5Rdereference1(reference_list_attribute, H5R_OBJECT, attribute_data[i].p); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
+		// 		// Process attribute data
+		// 	    for (int i = 0; i < dims[0]; i++) {
+		// 	        for (int j = 0; j < attribute_data[i].len; j++) {
+		// 	            // Process the reference data
+		// 		        hid_t referenced_obj = H5Rdereference1(reference_list_attribute, H5R_OBJECT, attribute_data[i].p); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
 
-				        if (referenced_obj < 0) {
-				            printf("Error dereferencing object.\n");
-				            return referenced_obj;
-				        }
+		// 		        if (referenced_obj < 0) {
+		// 		            printf("Error dereferencing object.\n");
+		// 		            return referenced_obj;
+		// 		        }
 
-				        // Fetch length of name of dataset
-				        int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
+		// 		        // Fetch length of name of dataset
+		// 		        int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
-				        if (size_of_name_buffer == 0) {
-				            printf("Error fetching size of dataset name buffer\n");
-				            return -1;
-				        }
+		// 		        if (size_of_name_buffer == 0) {
+		// 		            printf("Error fetching size of dataset name buffer\n");
+		// 		            return -1;
+		// 		        }
 
-				        // Create and populate buffer for dataset name
-				        char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
-				        H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
+		// 		        // Create and populate buffer for dataset name
+		// 		        char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
+		// 		        H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
 
-				        // Make copy of referenced dataset if it doesn't exist in the carved file
-				        // if (!H5Lexists(dest_file_id, referenced_obj_name, H5P_DEFAULT)) {
-				        if (!does_dataset_exist(H5Dopen(dest_file_id, referenced_obj_name, H5P_DEFAULT))) {
-    						H5Ldelete(dest_file_id, referenced_obj_name, H5P_DEFAULT);
+		// 		        // Make copy of referenced dataset if it doesn't exist in the carved file
+		// 		        // if (!H5Lexists(dest_file_id, referenced_obj_name, H5P_DEFAULT)) {
+		// 		        if (!does_dataset_exist(H5Dopen(dest_file_id, referenced_obj_name, H5P_DEFAULT))) {
+    	// 					H5Ldelete(dest_file_id, referenced_obj_name, H5P_DEFAULT);
 
-							// Make copy of dataset in the destination file
-							herr_t object_copy_return_val = H5Ocopy(src_file_id, referenced_obj_name, dest_file_id, referenced_obj_name, H5P_DEFAULT, H5P_DEFAULT);
+		// 					// Make copy of dataset in the destination file
+		// 					herr_t object_copy_return_val = H5Ocopy(src_file_id, referenced_obj_name, dest_file_id, referenced_obj_name, H5P_DEFAULT, H5P_DEFAULT);
 
-							if (object_copy_return_val < 0) {
-								printf("Copying %s failed.\n", referenced_obj_name);
-								return object_copy_return_val;
-							}
+		// 					if (object_copy_return_val < 0) {
+		// 						printf("Copying %s failed.\n", referenced_obj_name);
+		// 						return object_copy_return_val;
+		// 					}
 
-							// Open copied object
-							hid_t recent = H5Oopen(dest_file_id, referenced_obj_name, H5P_DEFAULT);
+		// 					// Open copied object
+		// 					hid_t recent = H5Oopen(dest_file_id, referenced_obj_name, H5P_DEFAULT);
 
-							if (recent < 0) {
-								printf("Object opening failed after copying referenced object\n");
-								return recent;
-							}
+		// 					if (recent < 0) {
+		// 						printf("Object opening failed after copying referenced object\n");
+		// 						return recent;
+		// 					}
 
-							// Delete attributes of copied object
-							herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL); // Iterate through each attribute and create a copy
+		// 					// Delete attributes of copied object
+		// 					herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL); // Iterate through each attribute and create a copy
 
-							if (attribute_iterate_return_val < 0) {
-								printf("Attribute iteration failed\n");
-								return attribute_iterate_return_val;
-							}
-				        }
-				    }
-				}
-			}
-		}
+		// 					if (attribute_iterate_return_val < 0) {
+		// 						printf("Attribute iteration failed\n");
+		// 						return attribute_iterate_return_val;
+		// 					}
+		// 		        }
+		// 		    }
+		// 		}
+		// 	}
+		// }
 
 		// Make copy of dataset in the destination file
 		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
