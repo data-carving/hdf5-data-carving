@@ -23,8 +23,20 @@ hid_t original_file_id = -1;
 char *is_netcdf4; // TODO: replace with an robust automatic check i.e. some kind of byte encoding 
 char **files_opened = NULL;
 int files_opened_current_size = 0;
+FILE *log_ptr = NULL;
+char *DEBUG = NULL;
 
 int nc_open(const char *path, int omode, int *ncidp) {
+	DEBUG = getenv("DEBUG");
+
+	if (DEBUG) {
+		if (log_ptr == NULL) {
+			log_ptr = fopen(".log", "w");
+		}
+
+		fprintf(log_ptr, "nc_open called %s %d %d\n", path, omode, ncidp);
+	}
+
 	original_nc_open = dlsym(RTLD_NEXT, "nc_open");
 
 	char *filename = malloc(strlen(path));
@@ -71,6 +83,16 @@ int nc_open(const char *path, int omode, int *ncidp) {
 	The copy includes all groups, datasets, and attributes but excludes the contents of the datasets.
 */
 hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
+	DEBUG = getenv("DEBUG");
+
+	if (DEBUG) {
+		if (log_ptr == NULL) {
+			log_ptr = fopen(".log", "w");
+		}
+
+		fprintf(log_ptr, "H5Fopen called %s %d %d\n", filename, flags, fapl_id);
+	}
+
 	// Fetch original function
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 
@@ -114,15 +136,22 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		original_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 		if (original_file_id == H5I_INVALID_HID) {
-			printf("Error opening original file to be used as fallback\n");
+			if (DEBUG)
+				fprintf(log_ptr, "Error opening original file to be used as fallback\n");
+			return original_file_id;
 		}
 
 		// Open carved file for re-execution mode
 		src_file_id = original_H5Fopen(carved_filename, flags, H5P_DEFAULT);
 
 		if (src_file_id == H5I_INVALID_HID) {
-			printf("Error opening carved file\n");
+			if (DEBUG)
+				fprintf(log_ptr, "Error opening carved file\n");
+			return src_file_id;
 		}
+
+		if (DEBUG)
+			fprintf(log_ptr, "CARVING DATASETS ACCESSED\n");
 
 		return src_file_id;
 	}
@@ -131,7 +160,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	src_file_id = original_H5Fopen(filename, flags, fapl_id);
 
 	if (src_file_id == H5I_INVALID_HID) {
-		printf("Error calling original H5Fopen function\n");
+		if (DEBUG)
+			fprintf(log_ptr, "Error calling original H5Fopen function\n");
 		return H5I_INVALID_HID;
 	}
 
@@ -141,7 +171,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
 			if (dest_file_id == H5I_INVALID_HID) {
-				printf("Error calling original H5Fopen function when carved file already exists or file was opened previously\n");
+				if (DEBUG)
+					fprintf(log_ptr, "Error calling original H5Fopen function when carved file already exists or file was opened previously\n");
 				return H5I_INVALID_HID;
 			}
 		}
@@ -167,7 +198,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	hid_t group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);
 
 	if (group_location_id == H5I_INVALID_HID) {
-		printf("Error opening source file root group\n");
+		if (DEBUG)
+			fprintf(log_ptr, "Error opening source file root group\n");
 		return H5I_INVALID_HID;
 	}
 
@@ -175,7 +207,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	dest_file_id = H5Fcreate(carved_filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
 
 	if (dest_file_id == H5I_INVALID_HID) {
-		printf("Error creating destination file\n");
+		if (DEBUG)
+			fprintf(log_ptr, "Error creating destination file\n");
 		return H5I_INVALID_HID;
 	}
 
@@ -183,18 +216,26 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	hid_t destination_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
 
 	if (destination_group_location_id == H5I_INVALID_HID) {
-		printf("Error opening destination file root group\n");
+		if (DEBUG)
+			fprintf(log_ptr, "Error opening destination file root group\n");
 		return H5I_INVALID_HID;
 	}
+
+	if (DEBUG)
+		fprintf(log_ptr, "CARVING GROUPS AND EMPTY DATASETS\n");
 
 	// Start DFS to make a copy of the HDF5 file structure without populating contents i.e a "skeleton" 
 	herr_t link_iterate_return_val = H5Literate2(group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, shallow_copy_object, &destination_group_location_id);
 
 	if (link_iterate_return_val < 0) {
-		printf("Link iteration failed\n");
+		if (DEBUG)
+			fprintf(log_ptr, "Link iteration failed\n");
 		return H5I_INVALID_HID;
 	}
 	
+	if (DEBUG)
+		fprintf(log_ptr, "CARVING DATASETS ACCESSED\n");
+
 	return src_file_id;
 }
 /* 
@@ -204,6 +245,9 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
     with the contents of the datasets accessed in the original file.
 */
 herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t file_space_id, hid_t	dxpl_id, void *buf)	{
+	if (DEBUG)
+		fprintf(log_ptr, "H5Dread called %d %d %d %d %d\n", dataset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id);
+
     // Original function call
 	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
 	herr_t return_val = original_H5Dread(dataset_id, mem_type_id, mem_space_id, file_space_id, dxpl_id, buf);
@@ -220,19 +264,30 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
     int size_of_name_buffer = H5Iget_name(dataset_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
     if (size_of_name_buffer == 0) {
-    	printf("Error fetching size of dataset name buffer\n");
+    	if (DEBUG)
+			fprintf(log_ptr, "Error fetching size of dataset name buffer\n");
     	return -1;
     }
 
    	// Create and populate buffer for dataset name
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
+    if (DEBUG)
+		fprintf(log_ptr, "H5Dread called on %s dataset\n", dataset_name);
 
 	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
 
 	// if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
     if (!does_dataset_exist(H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT))) {
-    	H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
+    	if (DEBUG)
+			fprintf(log_ptr, "Deleting empty dataset from carved file %s\n", dataset_name);
+    	hid_t link_deletion_ret_value = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
+
+    	if (link_deletion_ret_value < 0) {
+    		if (DEBUG)
+				fprintf(log_ptr, "Error deleting empty dataset object\n");
+    		return link_deletion_ret_value;
+    	}
 
 		// if (is_netcdf4 != NULL) {
 		// 	hid_t reference_list_attribute = H5Aopen_by_name(src_file_id, dataset_name, "DIMENSION_LIST", H5P_DEFAULT, H5P_DEFAULT);
@@ -311,18 +366,24 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 		// 	}
 		// }
 
+    	if (DEBUG)
+			fprintf(log_ptr, "Copying complete dataset to carved file %s\n", dataset_name);
+
+
 		// Make copy of dataset in the destination file
 		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
 		if (object_copy_return_val < 0) {
-			printf("Copying %s failed.\n", dataset_name);
+			if (DEBUG)
+				fprintf(log_ptr, "Copying %s failed.\n", dataset_name);
 			return object_copy_return_val;
 		}
 
 		hid_t recent = H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
 		if (recent < 0) {
-			printf("Object open after copying failed.\n");
+			if (DEBUG)
+				fprintf(log_ptr, "Object open after copying failed.\n");
 			return recent;
 		}
 
@@ -330,7 +391,8 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 		herr_t attribute_iterate_return_val = H5Aiterate2(recent, H5_INDEX_NAME, H5_ITER_INC, NULL, delete_attributes, NULL);
 
 		if (attribute_iterate_return_val < 0) {
-			printf("Attribute iteration failed\n");
+			if (DEBUG)
+				fprintf(log_ptr, "Attribute iteration failed\n");
 			return attribute_iterate_return_val;
 		}
 	}
@@ -344,7 +406,10 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	are present in the carved file or not. If not, diverts the control flow to access the dataset in 
 	the original file instead of the carved file.
 */
-hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
+hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
+	if (DEBUG)
+		fprintf(log_ptr, "H5Oopen called %d %s %d\n", loc_id, name, lapl_id);
+
 	// Original function call
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 	hid_t return_val;
@@ -358,7 +423,8 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
 	    if (size_of_name_buffer == 0) {
-	    	printf("Error fetching size of dataset name buffer\n");
+	    	if (DEBUG)
+				fprintf(log_ptr, "Error fetching size of dataset name buffer\n");
 	    	return -1;
 	    }
 
@@ -373,7 +439,8 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 		return_val = original_H5Oopen(loc_id, name, lapl_id);
 
 		if (return_val == H5I_INVALID_HID) {
-			printf("Error opening object\n");
+			if (DEBUG)
+				fprintf(log_ptr, "Error opening object\n");
 			return return_val;
 		}
 	}
@@ -382,6 +449,9 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id)	 {
 }
 
 void H5_term_library(void) {
+	if (DEBUG)
+		fprintf(log_ptr, "H5_term_library called\n");
+
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
@@ -397,11 +467,15 @@ void H5_term_library(void) {
 			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);		
 			hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
 
+			if (DEBUG)
+				fprintf(log_ptr, "CARVING ATTRIBUTES\n");
+
 			// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
 			herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
 			
 			if (attribute_iterate_return_val < 0) {
-				printf("Attribute iteration failed\n");
+				if (DEBUG)
+					fprintf(log_ptr, "Attribute iteration failed\n");
 				return attribute_iterate_return_val;
 			}
 
@@ -409,7 +483,8 @@ void H5_term_library(void) {
 			herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
 
 			if (link_iterate_return_val < 0) {
-				printf("Link iteration failed\n");
+				if (DEBUG)
+					fprintf(log_ptr, "Link iteration failed\n");
 				return H5I_INVALID_HID;
 			}
 		}
