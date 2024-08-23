@@ -39,7 +39,7 @@ int nc_open(const char *path, int omode, int *ncidp) {
 
 	original_nc_open = dlsym(RTLD_NEXT, "nc_open");
 
-	char *filename = malloc(strlen(path));
+	char *filename = malloc(strlen(path) + 1);
 	strcpy(filename, path);
 
 	// Create name of carved file
@@ -103,7 +103,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	use_carved = getenv("USE_CARVED");
 
 	if (is_netcdf4 != NULL && use_carved != NULL) {
-		char *filename_copy = malloc(strlen(filename));
+		char *filename_copy = malloc(strlen(filename) + 1);
 		strcpy(filename_copy, filename);
 		filename_copy[strlen(filename_copy) - 7] = '\0';
 		filename = filename_copy;

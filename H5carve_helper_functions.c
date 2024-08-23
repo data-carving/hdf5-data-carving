@@ -563,7 +563,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 char *get_carved_filename(const char *filename) {
 	// Create name of the carved file
 	int filename_absolute_path_length = strlen(filename);
-	char filename_copy[filename_absolute_path_length];
+	char filename_copy[filename_absolute_path_length + 1];
 	strcpy(filename_copy, filename);
 
 	char *filename_without_directory_separators = strrchr(filename_copy, '/');
