@@ -460,13 +460,39 @@ void H5_term_library(void) {
 	if (use_carved == NULL) {
 		for (int i = 0; i < files_opened_current_size; i++) {
 			src_file_id = original_H5Fopen(files_opened[i], H5F_ACC_RDONLY, H5P_DEFAULT);
+
+			if (src_file_id == H5I_INVALID_HID) {
+				if (DEBUG)
+					fprintf(log_ptr, "Error reopening source file for copying attributes %s\n", files_opened[i]);
+				return src_file_id;
+			}
+
 			char *carved_filename = malloc(strlen(files_opened[i]) + 7 + 1);
 			strcpy(carved_filename, files_opened[i]);
 			strcat(carved_filename, ".carved");
 			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
-			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);		
+			if (dest_file_id == H5I_INVALID_HID) {
+				if (DEBUG)
+					fprintf(log_ptr, "Error reopening dest file for copying attributes %s\n", carved_filename);
+				return dest_file_id;
+			}
+
+			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);	
+
+			if (original_file_group_location_id == H5I_INVALID_HID) {
+				if (DEBUG)
+					fprintf(log_ptr, "Error opening source file root group %d\n", src_file_id);
+				return H5I_INVALID_HID;
+			}
+
 			hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+
+			if (carved_file_group_location_id == H5I_INVALID_HID) {
+				if (DEBUG)
+					fprintf(log_ptr, "Error opening carved file root group %d\n", dest_file_id);
+				return H5I_INVALID_HID;
+			}
 
 			if (DEBUG)
 				fprintf(log_ptr, "CARVING ATTRIBUTES\n");
