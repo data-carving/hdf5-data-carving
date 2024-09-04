@@ -467,9 +467,40 @@ void H5_term_library(void) {
 				return src_file_id;
 			}
 
-			char *carved_filename = malloc(strlen(files_opened[i]) + 7 + 1);
-			strcpy(carved_filename, files_opened[i]);
-			strcat(carved_filename, ".carved");
+			// Create name of carved file
+			char *carved_directory = getenv("CARVED_DIRECTORY");
+			is_netcdf4 = getenv("NETCDF4");
+			// Fetch USE_CARVED environment variable
+			use_carved = getenv("USE_CARVED");
+
+			if (is_netcdf4 != NULL && use_carved != NULL) {
+				char *filename_copy = malloc(strlen(files_opened[i]) + 1);
+				strcpy(filename_copy, files_opened[i]);
+				filename_copy[strlen(filename_copy) - 7] = '\0';
+				files_opened[i] = filename_copy;
+			}
+
+			char *filename_without_directory_separators = strrchr(files_opened[i], '/');
+		    
+		    if (filename_without_directory_separators != NULL) {
+		            filename_without_directory_separators = filename_without_directory_separators + 1;
+		    } else {
+		            filename_without_directory_separators = files_opened[i];
+		    }
+
+			char carved_filename[(carved_directory == NULL ? strlen(files_opened[i]) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
+
+			if (carved_directory == NULL) {
+			    carved_filename[0] = '\0';
+				strcat(carved_filename, files_opened[i]);
+				strcat(carved_filename, ".carved");	
+			} else {
+				carved_filename[0] = '\0';
+				strcat(carved_filename, carved_directory);
+				strcat(carved_filename, filename_without_directory_separators);
+				strcat(carved_filename, ".carved");
+			}
+	
 			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 
 			if (dest_file_id == H5I_INVALID_HID) {
