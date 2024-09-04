@@ -285,7 +285,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	    // Currently, supports only object references, and not dataset region references
 	    if (H5Tequal(attribute_data_type, H5T_STD_REF_OBJ)) {
 	    	if (DEBUG)
-    			fprintf(log_ptr, "Copying REFERENCE attribute %s type %d %d elements", name_of_attribute, H5T_STD_REF_OBJ, num_elements);
+    			fprintf(log_ptr, "Copying REFERENCE attribute %s type %d %d elements\n", name_of_attribute, H5T_STD_REF_OBJ, num_elements);
 
 	        hobj_ref_t *ref_data_dest = copy_reference_object(ref_data_src_file, num_elements, src_attribute_id);
 
@@ -387,6 +387,8 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	        return write_status;
 	    }
     } else {
+    	if (DEBUG)
+    		fprintf(log_ptr, "Copying OTHER attribute %s\n", name_of_attribute);
     	// Fetch data space of attribute
 		attribute_data_space = H5Aget_space(src_attribute_id);
 
@@ -414,7 +416,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 		
 		if (dest_attribute_id < 0) {
 			if (DEBUG)
-    			fprintf(log_ptr, "Error creating attribute\n");
+    			fprintf(log_ptr, "Error creating attribute %d %s %d %d\n", dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space);
 			return dest_attribute_id;
 		}
 
