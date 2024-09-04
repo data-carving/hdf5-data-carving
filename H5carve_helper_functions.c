@@ -153,6 +153,8 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 }	
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+	if (DEBUG)
+		fprintf(log_ptr, "Copying attributes of object %s\n", name);
 	// Open the object
 	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 	hid_t object_id = original_H5Oopen(loc_id, name, H5P_DEFAULT);
