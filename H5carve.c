@@ -379,7 +379,8 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 			return object_copy_return_val;
 		}
 
-		hid_t recent = H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
+		original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
+		hid_t recent = original_H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
 
 		if (recent < 0) {
 			if (DEBUG)
