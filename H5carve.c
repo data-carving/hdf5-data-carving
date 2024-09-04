@@ -137,7 +137,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 		if (original_file_id == H5I_INVALID_HID) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error opening original file to be used as fallback\n");
+				fprintf(log_ptr, "Error opening original file to be used as fallback %s %d %d\n", filename, flags, fapl_id);
 			return original_file_id;
 		}
 
@@ -146,7 +146,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 		if (src_file_id == H5I_INVALID_HID) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error opening carved file\n");
+				fprintf(log_ptr, "Error opening carved file %s %d\n", carved_filename, flags);
 			return src_file_id;
 		}
 
@@ -161,7 +161,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (src_file_id == H5I_INVALID_HID) {
 		if (DEBUG)
-			fprintf(log_ptr, "Error calling original H5Fopen function\n");
+			fprintf(log_ptr, "Error calling original H5Fopen function %s %d %d\n", filename, flags, fapl_id);
 		return H5I_INVALID_HID;
 	}
 
@@ -172,7 +172,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 			if (dest_file_id == H5I_INVALID_HID) {
 				if (DEBUG)
-					fprintf(log_ptr, "Error calling original H5Fopen function when carved file already exists or file was opened previously\n");
+					fprintf(log_ptr, "Error calling original H5Fopen function when carved file already exists or file was opened previously %s\n", carved_filename);
 				return H5I_INVALID_HID;
 			}
 		}
@@ -199,7 +199,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (group_location_id == H5I_INVALID_HID) {
 		if (DEBUG)
-			fprintf(log_ptr, "Error opening source file root group\n");
+			fprintf(log_ptr, "Error opening source file root group %d\n", src_file_id);
 		return H5I_INVALID_HID;
 	}
 
@@ -208,7 +208,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (dest_file_id == H5I_INVALID_HID) {
 		if (DEBUG)
-			fprintf(log_ptr, "Error creating destination file\n");
+			fprintf(log_ptr, "Error creating destination file %s\n", carved_filename);
 		return H5I_INVALID_HID;
 	}
 
@@ -217,7 +217,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (destination_group_location_id == H5I_INVALID_HID) {
 		if (DEBUG)
-			fprintf(log_ptr, "Error opening destination file root group\n");
+			fprintf(log_ptr, "Error opening destination file root group %d\n", dest_file_id);
 		return H5I_INVALID_HID;
 	}
 
@@ -229,7 +229,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (link_iterate_return_val < 0) {
 		if (DEBUG)
-			fprintf(log_ptr, "Link iteration failed\n");
+			fprintf(log_ptr, "Link iteration failed %d %d\n", group_location_id, destination_group_location_id);
 		return H5I_INVALID_HID;
 	}
 	
@@ -265,7 +265,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
     if (size_of_name_buffer == 0) {
     	if (DEBUG)
-			fprintf(log_ptr, "Error fetching size of dataset name buffer\n");
+			fprintf(log_ptr, "Error fetching size of dataset name buffer %d\n", dataset_id);
     	return -1;
     }
 
@@ -285,7 +285,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
     	if (link_deletion_ret_value < 0) {
     		if (DEBUG)
-				fprintf(log_ptr, "Error deleting empty dataset object\n");
+				fprintf(log_ptr, "Error deleting empty dataset object %d %s\n", dest_file_id, dataset_name);
     		return link_deletion_ret_value;
     	}
 
@@ -375,7 +375,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 		if (object_copy_return_val < 0) {
 			if (DEBUG)
-				fprintf(log_ptr, "Copying %s failed.\n", dataset_name);
+				fprintf(log_ptr, "Error copying object %d %s %d %s\n", src_file_id, dataset_name, dest_file_id, dataset_name);
 			return object_copy_return_val;
 		}
 
@@ -384,7 +384,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 		if (recent < 0) {
 			if (DEBUG)
-				fprintf(log_ptr, "Object open after copying failed.\n");
+				fprintf(log_ptr, "Error opening object after H5Ocopy %d %s\n", dest_file_id, dataset_name);
 			return recent;
 		}
 
@@ -425,7 +425,7 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
 
 	    if (size_of_name_buffer == 0) {
 	    	if (DEBUG)
-				fprintf(log_ptr, "Error fetching size of dataset name buffer\n");
+				fprintf(log_ptr, "Error fetching size of dataset name buffer %d\n", loc_id);
 	    	return -1;
 	    }
 
@@ -441,7 +441,7 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
 
 		if (return_val == H5I_INVALID_HID) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error opening object\n");
+				fprintf(log_ptr, "Error opening object %d %s %d\n", loc_id, name, lapl_id);
 			return return_val;
 		}
 	}
