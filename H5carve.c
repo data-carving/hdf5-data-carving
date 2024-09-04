@@ -31,7 +31,7 @@ int nc_open(const char *path, int omode, int *ncidp) {
 
 	if (DEBUG) {
 		if (log_ptr == NULL) {
-			log_ptr = fopen(".log", "w");
+			log_ptr = fopen("log", "w");
 		}
 
 		fprintf(log_ptr, "nc_open called %s %d %d\n", path, omode, ncidp);
@@ -87,7 +87,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	if (DEBUG) {
 		if (log_ptr == NULL) {
-			log_ptr = fopen(".log", "w");
+			log_ptr = fopen("log", "w");
 		}
 
 		fprintf(log_ptr, "H5Fopen called %s %d %d\n", filename, flags, fapl_id);
