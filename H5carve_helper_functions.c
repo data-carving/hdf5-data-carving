@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
+hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
 
 extern hid_t src_file_id;
 extern hid_t dest_file_id;
@@ -153,7 +154,8 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 
 herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	// Open the object
-	hid_t object_id = H5Oopen(loc_id, name, H5P_DEFAULT);
+	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
+	hid_t object_id = original_H5Oopen(loc_id, name, H5P_DEFAULT);
 
 	if (object_id < 0) {
 		printf("Error opening object\n");
@@ -192,7 +194,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 			return attribute_iterate_return_val;
 		}
 	} else if (object_type == H5I_GROUP) {
-		hid_t dest_object_id = H5Oopen(dest_parent_object_id, name, H5P_DEFAULT);
+		hid_t dest_object_id = original_H5Oopen(dest_parent_object_id, name, H5P_DEFAULT);
 
 		if (dest_object_id < 0) {
 			printf("Error opening dest object\n");
@@ -446,7 +448,8 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
     	fprintf(log_ptr, "Creating shallow copy of object %d %s\n", loc_id, name);
 
 	// Open the object
-	hid_t object_id = H5Oopen(loc_id, name, H5P_DEFAULT);
+	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
+	hid_t object_id = original_H5Oopen(loc_id, name, H5P_DEFAULT);
 
 	if (object_id < 0) {
 		if (DEBUG)
