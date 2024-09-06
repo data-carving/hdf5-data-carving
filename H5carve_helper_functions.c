@@ -299,8 +299,13 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	            return -1;
 	        }
 
-	        // Create the attribute and write the reference
-	        hid_t attr_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
+	        hid_t attr_id;
+	        if (H5Aexists(dest_object_id, name_of_attribute)) {
+	        	attr_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
+	        } else {
+	        	// Create the attribute and write the reference
+	        	attr_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
+	        }
 
 	        if (attr_id < 0) {
 	            if (DEBUG)

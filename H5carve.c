@@ -165,6 +165,20 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	if (!is_already_recorded(filename)) {
+		// Record files that have been opened for copying attributes
+		if (files_opened == NULL) {
+	        files_opened = malloc((files_opened_current_size + 1) * sizeof(char*));
+	    } else {
+	        files_opened = realloc(files_opened, (files_opened_current_size + 1) * sizeof(char*));
+	    }
+	    
+	    files_opened[files_opened_current_size] = malloc(sizeof(char) * (strlen(filename) + 1));
+	    strcpy(files_opened[files_opened_current_size], filename);
+
+	    files_opened_current_size += 1;
+	}
+
 	// If carved file already exists or file was opened previously, skeleton file has already been created. Skip first phase.
 	if (access(carved_filename, F_OK) == 0) {
 		if (dest_file_id == -1) {
@@ -178,20 +192,6 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		}
 
     	return src_file_id;
-	}
-
-	if (!is_already_recorded(filename)) {
-		// Record files that have been opened for copying attributes
-		if (files_opened == NULL) {
-	        files_opened = malloc((files_opened_current_size + 1) * sizeof(char*));
-	    } else {
-	        files_opened = realloc(files_opened, (files_opened_current_size + 1) * sizeof(char*));
-	    }
-	    
-	    files_opened[files_opened_current_size] = malloc(sizeof(char) * (strlen(filename) + 1));
-	    strcpy(files_opened[files_opened_current_size], filename);
-
-	    files_opened_current_size += 1;
 	}
 
 	// Open root group of source file
