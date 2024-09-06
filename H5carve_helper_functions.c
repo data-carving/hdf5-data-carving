@@ -299,24 +299,23 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	            return -1;
 	        }
 
-	        hid_t attr_id;
 	        if (H5Aexists(dest_object_id, name_of_attribute)) {
-	        	attr_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
+	        	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
 	        } else {
 	        	// Create the attribute and write the reference
-	        	attr_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
+	        	dest_attribute_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
 	        }
 
-	        if (attr_id < 0) {
+	        if (dest_attribute_id < 0) {
 	            if (DEBUG)
     				fprintf(log_ptr, "Error creating destination file attribute %d %s %d\n", dest_object_id, name_of_attribute, ref_data_dest_dataspace);
 	            return -1;
 	        }
 
-	        herr_t status = H5Awrite(attr_id, H5T_STD_REF_OBJ, ref_data_dest);
+	        herr_t status = H5Awrite(dest_attribute_id, H5T_STD_REF_OBJ, ref_data_dest);
 	        if (status < 0) {
 	            if (DEBUG)
-    				fprintf(log_ptr, "Error writing reference to attribute %d\n", attr_id);
+    				fprintf(log_ptr, "Error writing reference to attribute %d\n", dest_attribute_id);
 	            return -1;
 	        }
 	    } else if (H5Tequal(attribute_data_type, H5T_STD_REF_DSETREG)) {
@@ -353,8 +352,6 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 
         copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
 
-        hid_t dest_attribute_id;
-
         if (H5Aexists(dest_object_id, name_of_attribute)) {
         	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
         } else {
@@ -387,8 +384,6 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 		hvl_t *rdata = (hvl_t *)malloc(dims[0] * sizeof(hvl_t));
 
 		herr_t status = H5Aread(src_attribute_id, attribute_data_type, rdata);
-
-		hid_t dest_attribute_id;
 			
 		if (H5Aexists(dest_object_id, name_of_attribute)) {
 			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
