@@ -353,7 +353,13 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 
         copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
 
-	    hid_t dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+        hid_t dest_attribute_id;
+
+        if (H5Aexists(dest_object_id, name_of_attribute)) {
+        	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
+        } else {
+	    	dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+        }
 
 	    if (dest_attribute_id < 0) {
 			if (DEBUG)
@@ -382,7 +388,13 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 
 		herr_t status = H5Aread(src_attribute_id, attribute_data_type, rdata);
 
-		hid_t dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT, H5P_DEFAULT);
+		hid_t dest_attribute_id;
+			
+		if (H5Aexists(dest_object_id, name_of_attribute)) {
+			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
+		} else {
+			dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT, H5P_DEFAULT);
+		}
 
 		hvl_t *dest_data = copy_vlen_type(src_attribute_id, attribute_data_type, rdata, dims[0]);
 
@@ -418,8 +430,12 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 			return read_return_val;
 		}
 
-		// Create attribute in destination file
-		dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+		if (H5Aexists(dest_object_id, name_of_attribute)) {
+			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
+		} else {
+			// Create attribute in destination file
+			dest_attribute_id = H5Acreate1(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT);
+		}
 		
 		if (dest_attribute_id < 0) {
 			if (DEBUG)
