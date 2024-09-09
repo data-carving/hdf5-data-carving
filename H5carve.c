@@ -272,20 +272,65 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
    	// Create and populate buffer for dataset name
     char *dataset_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(dataset_id, dataset_name, size_of_name_buffer); // Fill dataset_name buffer with the dataset name
+    
     if (DEBUG)
 		fprintf(log_ptr, "H5Dread called on %s dataset\n", dataset_name);
 
-	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
+	hid_t dataset_file_id = H5Iget_file_id(dataset_id);
+	int dataset_filename_len = H5Fget_name(dataset_file_id, NULL, 0) + 1;
+	char *dataset_filename = (char *)malloc(dataset_filename_len);
+	H5Fget_name(dataset_file_id, dataset_filename, dataset_filename_len);
 
+	// Create name of carved file
+	char *carved_directory = getenv("CARVED_DIRECTORY");
+	is_netcdf4 = getenv("NETCDF4");
+	// Fetch USE_CARVED environment variable
+	use_carved = getenv("USE_CARVED");
+
+	if (is_netcdf4 != NULL && use_carved != NULL) {
+		char *filename_copy = malloc(strlen(dataset_filename) + 1);
+		strcpy(filename_copy, dataset_filename);
+		filename_copy[strlen(filename_copy) - 7] = '\0';
+		dataset_filename = filename_copy;
+	}
+
+	char *filename_without_directory_separators = strrchr(dataset_filename, '/');
+    
+    if (filename_without_directory_separators != NULL) {
+            filename_without_directory_separators = filename_without_directory_separators + 1;
+    } else {
+            filename_without_directory_separators = dataset_filename;
+    }
+
+	char carved_filename[(carved_directory == NULL ? strlen(dataset_filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
+
+	if (carved_directory == NULL) {
+	    carved_filename[0] = '\0';
+		strcat(carved_filename, dataset_filename);
+		strcat(carved_filename, ".carved");	
+	} else {
+		carved_filename[0] = '\0';
+		strcat(carved_filename, carved_directory);
+		strcat(carved_filename, filename_without_directory_separators);
+		strcat(carved_filename, ".carved");
+	}
+	
+	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
+	hid_t dataset_carved_file = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
+	free(dataset_filename);
+
+	hid_t carved_empty_dataset = H5Dopen(dataset_carved_file, dataset_name, H5P_DEFAULT);
+
+	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
 	// if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
-    if (!does_dataset_exist(H5Dopen(dest_file_id, dataset_name, H5P_DEFAULT))) {
+    if (!does_dataset_exist(carved_empty_dataset)) {
     	if (DEBUG)
 			fprintf(log_ptr, "Deleting empty dataset from carved file %s\n", dataset_name);
-    	hid_t link_deletion_ret_value = H5Ldelete(dest_file_id, dataset_name, H5P_DEFAULT);
+    	hid_t link_deletion_ret_value = H5Ldelete(dataset_carved_file, dataset_name, H5P_DEFAULT);
 
     	if (link_deletion_ret_value < 0) {
     		if (DEBUG)
-				fprintf(log_ptr, "Error deleting empty dataset object %d %s\n", dest_file_id, dataset_name);
+				fprintf(log_ptr, "Error deleting empty dataset object %d %s\n", dataset_carved_file, dataset_name);
     		return link_deletion_ret_value;
     	}
 
@@ -371,20 +416,20 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 
 		// Make copy of dataset in the destination file
-		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dest_file_id, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
+		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dataset_carved_file, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
 		if (object_copy_return_val < 0) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error copying object %d %s %d %s\n", src_file_id, dataset_name, dest_file_id, dataset_name);
+				fprintf(log_ptr, "Error copying object %d %s %d %s\n", src_file_id, dataset_name, dataset_carved_file, dataset_name);
 			return object_copy_return_val;
 		}
 
 		original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
-		hid_t recent = original_H5Oopen(dest_file_id, dataset_name, H5P_DEFAULT);
+		hid_t recent = original_H5Oopen(dataset_carved_file, dataset_name, H5P_DEFAULT);
 
 		if (recent < 0) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error opening object after H5Ocopy %d %s\n", dest_file_id, dataset_name);
+				fprintf(log_ptr, "Error opening object after H5Ocopy %d %s\n", dataset_carved_file, dataset_name);
 			return recent;
 		}
 
