@@ -316,6 +316,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	}
 	
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
+	hid_t dataset_src_file = original_H5Fopen(dataset_filename, H5F_ACC_RDONLY, H5P_DEFAULT);
 	hid_t dataset_carved_file = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 	free(dataset_filename);
 
@@ -416,11 +417,11 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 
 		// Make copy of dataset in the destination file
-		herr_t object_copy_return_val = H5Ocopy(src_file_id, dataset_name, dataset_carved_file, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
+		herr_t object_copy_return_val = H5Ocopy(dataset_src_file, dataset_name, dataset_carved_file, dataset_name, H5P_DEFAULT, H5P_DEFAULT);
 
 		if (object_copy_return_val < 0) {
 			if (DEBUG)
-				fprintf(log_ptr, "Error copying object %d %s %d %s\n", src_file_id, dataset_name, dataset_carved_file, dataset_name);
+				fprintf(log_ptr, "Error copying object %d %s %d %s\n", dataset_src_file, dataset_name, dataset_carved_file, dataset_name);
 			return object_copy_return_val;
 		}
 
@@ -442,6 +443,9 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 			return attribute_iterate_return_val;
 		}
 	}
+
+	H5Fclose(dataset_src_file);
+	H5Fclose(dataset_carved_file);
 	
 	return return_val;
 }
@@ -590,6 +594,9 @@ void H5_term_library(void) {
 					fprintf(log_ptr, "Link iteration failed\n");
 				return H5I_INVALID_HID;
 			}
+
+			H5Fclose(src_file_id);
+			H5Fclose(dest_file_id);
 		}
 	}
 
