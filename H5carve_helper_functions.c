@@ -585,7 +585,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 
 char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved) {
 	char *carved_directory = getenv("CARVED_DIRECTORY");
-	
+
 	if (is_netcdf4 != NULL && use_carved != NULL) {
 		char *filename_copy = malloc(strlen(filename) + 1);
 		strcpy(filename_copy, filename);
@@ -627,50 +627,6 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 }
 
 bool does_dataset_exist(hid_t dataset_id) {
-	// Retrives the dataspace of dataset
-	// hid_t dataspace = H5Dget_space(dataset_id);
-
-	// if (dataspace == H5I_INVALID_HID) {
-	// 	printf("Error getting destination dataspace\n");
-	// 	return dataspace;
-	// }
-
-	// hid_t datatype = H5Dget_type(dataset_id);
-
-	// if (datatype == H5I_INVALID_HID) {
-	// 	printf("Error getting destination datatype\n");
-	// 	return datatype;
-	// }
-
-	// H5S_class_t dataspace_class = H5Sget_simple_extent_type(dataspace);
-
-	// if (dataspace_class == H5S_NO_CLASS) {
-	// 	printf("Error getting destination dataspace class\n");
-	// 	return dataspace_class;
-	// }
-
-	// hid_t plist_id = H5Dget_create_plist(dataset_id);
-
-	// void *fill_value = malloc(H5Tget_size(datatype));
-
-	// H5Pget_fill_value(plist_id, datatype, fill_value);
-	// int rank = H5Sget_simple_extent_ndims(dataspace);
-
-	// printf("%d\n", rank);
-
-	// // If dataspace class is NULL, it means the dataset is empty. 
-	// if (dataspace_class == H5S_SCALAR) {
-	// 	int scalar_value;
-	// 	hid_t datatype_id = H5Dget_type(dataset_id);
-
-	// 	original_H5Dread = dlsym(RTLD_NEXT, "H5Dread");
-	// 	original_H5Dread(dataset_id, datatype_id, H5S_ALL, H5S_ALL, H5P_DEFAULT, &scalar_value);
-
-	// 	if (scalar_value == 0) {
-	// 		return false;
-	// 	}
-	// }
-
 	if (!H5Aexists(dataset_id, "CARVED_DATASET_IS_EMPTY")) {
 		return true;
 	}
