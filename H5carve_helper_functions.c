@@ -510,8 +510,6 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	
 	// If object is a dataset, make shallow copy of dataset and terminate
 	if (object_type == H5I_DATASET) {
-		// printf("Creating shallow copy of dataset %s\n", name);
-
 		hid_t dataset_id, data_type, data_space;
 
 		// Open the dataset

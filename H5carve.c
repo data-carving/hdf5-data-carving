@@ -275,7 +275,6 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	hid_t carved_empty_dataset = H5Dopen(dataset_carved_file, dataset_name, H5P_DEFAULT);
 
 	// If the dataset being read does not exist in the carved file, copy the datatset object to the carved file
-	// if (!H5Lexists(dest_file_id, dataset_name, H5P_DEFAULT)) {
     if (!does_dataset_exist(carved_empty_dataset)) {
     	if (DEBUG)
 			fprintf(log_ptr, "Deleting empty dataset from carved file %s\n", dataset_name);
