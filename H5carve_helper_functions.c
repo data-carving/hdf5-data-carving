@@ -13,9 +13,9 @@ extern hid_t dest_file_id;
 extern char *use_precarved;
 extern hid_t original_file_id;
 extern char **files_opened;
-extern files_opened_current_size;
-extern log_ptr;
-extern DEBUG;
+extern int files_opened_current_size;
+extern FILE *log_ptr;
+extern char *DEBUG;
 
 hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
 	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));
