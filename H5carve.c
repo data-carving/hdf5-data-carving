@@ -42,29 +42,7 @@ int nc_open(const char *path, int omode, int *ncidp) {
 	char *filename = malloc(strlen(path) + 1);
 	strcpy(filename, path);
 
-	// Create name of carved file
-	char *carved_directory = getenv("CARVED_DIRECTORY");
-	
-	char *filename_without_directory_separators = strrchr(filename, '/');
-    
-    if (filename_without_directory_separators != NULL) {
-            filename_without_directory_separators = filename_without_directory_separators + 1;
-    } else {
-            filename_without_directory_separators = filename;
-    }
-
-	char carved_filename[(carved_directory == NULL ? strlen(filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
-
-	if (carved_directory == NULL) {
-	    carved_filename[0] = '\0';
-		strcat(carved_filename, filename);
-		strcat(carved_filename, ".carved");	
-	} else {
-		carved_filename[0] = '\0';
-		strcat(carved_filename, carved_directory);
-		strcat(carved_filename, filename_without_directory_separators);
-		strcat(carved_filename, ".carved");
-	}
+	char *carved_filename = get_carved_filename(filename, NULL, NULL);
 	
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
@@ -102,33 +80,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
-	if (is_netcdf4 != NULL && use_carved != NULL) {
-		char *filename_copy = malloc(strlen(filename) + 1);
-		strcpy(filename_copy, filename);
-		filename_copy[strlen(filename_copy) - 7] = '\0';
-		filename = filename_copy;
-	}
-
-	char *filename_without_directory_separators = strrchr(filename, '/');
-    
-    if (filename_without_directory_separators != NULL) {
-            filename_without_directory_separators = filename_without_directory_separators + 1;
-    } else {
-            filename_without_directory_separators = filename;
-    }
-
-	char carved_filename[(carved_directory == NULL ? strlen(filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
-
-	if (carved_directory == NULL) {
-	    carved_filename[0] = '\0';
-		strcat(carved_filename, filename);
-		strcat(carved_filename, ".carved");	
-	} else {
-		carved_filename[0] = '\0';
-		strcat(carved_filename, carved_directory);
-		strcat(carved_filename, filename_without_directory_separators);
-		strcat(carved_filename, ".carved");
-	}
+	char *carved_filename = get_carved_filename(filename, is_netcdf4, use_carved);
 
 	// Check if USE_CARVED environment variable has been set
 	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {
@@ -522,33 +474,7 @@ void H5_term_library(void) {
 			// Fetch USE_CARVED environment variable
 			use_carved = getenv("USE_CARVED");
 
-			if (is_netcdf4 != NULL && use_carved != NULL) {
-				char *filename_copy = malloc(strlen(files_opened[i]) + 1);
-				strcpy(filename_copy, files_opened[i]);
-				filename_copy[strlen(filename_copy) - 7] = '\0';
-				files_opened[i] = filename_copy;
-			}
-
-			char *filename_without_directory_separators = strrchr(files_opened[i], '/');
-		    
-		    if (filename_without_directory_separators != NULL) {
-		            filename_without_directory_separators = filename_without_directory_separators + 1;
-		    } else {
-		            filename_without_directory_separators = files_opened[i];
-		    }
-
-			char carved_filename[(carved_directory == NULL ? strlen(files_opened[i]) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
-
-			if (carved_directory == NULL) {
-			    carved_filename[0] = '\0';
-				strcat(carved_filename, files_opened[i]);
-				strcat(carved_filename, ".carved");	
-			} else {
-				carved_filename[0] = '\0';
-				strcat(carved_filename, carved_directory);
-				strcat(carved_filename, filename_without_directory_separators);
-				strcat(carved_filename, ".carved");
-			}
+			char *carved_filename = get_carved_filename(files_opened[i], is_netcdf4, use_carved);
 	
 			dest_file_id = original_H5Fopen(carved_filename, H5F_ACC_RDWR, H5P_DEFAULT);
 

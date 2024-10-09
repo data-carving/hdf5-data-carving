@@ -583,30 +583,46 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	return 0;
 }
 
-char *get_carved_filename(const char *filename) {
-	// Create name of the carved file
-	int filename_absolute_path_length = strlen(filename);
-	char filename_copy[filename_absolute_path_length + 1];
-	strcpy(filename_copy, filename);
-
-	char *filename_without_directory_separators = strrchr(filename_copy, '/');
+char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved) {
+	char *carved_directory = getenv("CARVED_DIRECTORY");
 	
-	if (filename_without_directory_separators == NULL) {
-		filename_without_directory_separators = filename_copy;
-	} else {
-		filename_without_directory_separators += 1; // add 1 to remove the starting '/'
+	if (is_netcdf4 != NULL && use_carved != NULL) {
+		char *filename_copy = malloc(strlen(filename) + 1);
+		strcpy(filename_copy, filename);
+		filename_copy[strlen(filename_copy) - 7] = '\0';
+		filename = filename_copy;
 	}
 
-	char *filename_without_extension = strtok(filename_without_directory_separators, ".");
-	char *filename_extension = strtok(NULL, ".");
-	char carved_suffix[] = "_carved.";
-	int filename_length = strlen(filename_without_extension);
-	int suffix_length = strlen(carved_suffix);
-	char *carved_filename = malloc(sizeof(char) * (filename_length + suffix_length + 1));
-	strcpy(carved_filename, filename_without_extension);
-	strcat(carved_filename, carved_suffix);
-	strcat(carved_filename, filename_extension);
-	
+	char *filename_without_directory_separators = strrchr(filename, '/');
+
+	if (filename_without_directory_separators != NULL) {
+	        filename_without_directory_separators = filename_without_directory_separators + 1;
+	} else {
+	        filename_without_directory_separators = filename;
+	}
+
+	char *carved_filename;
+	int carved_filename_length_without_suffix;
+
+	if (carved_directory == NULL) {
+		carved_filename_length_without_suffix = strlen(filename);
+	} else {
+		carved_filename_length_without_suffix = strlen(carved_directory) + strlen(filename_without_directory_separators);
+	}
+
+	carved_filename = (char *)malloc(carved_filename_length_without_suffix + 7 + 1); // 7 + 1 is for the suffix .carved and null terminating character
+
+	if (carved_directory == NULL) {
+	    carved_filename[0] = '\0';
+		strcat(carved_filename, filename);
+		strcat(carved_filename, ".carved");	
+	} else {
+		carved_filename[0] = '\0';
+		strcat(carved_filename, carved_directory);
+		strcat(carved_filename, filename_without_directory_separators);
+		strcat(carved_filename, ".carved");
+	}
+
 	return carved_filename;
 }
 

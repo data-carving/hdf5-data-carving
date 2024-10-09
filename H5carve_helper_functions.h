@@ -10,7 +10,7 @@ herr_t delete_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo
 bool is_already_recorded(char *filename);
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 void count_objects_in_group(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
-char *get_carved_filename(const char *filename);
+char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved);
 bool does_dataset_exist(hid_t dataset_id);
 
 #endif
