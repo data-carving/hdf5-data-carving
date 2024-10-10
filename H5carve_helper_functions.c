@@ -53,6 +53,8 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	        	fprintf(log_ptr, "Error creating destination file reference %ld %s\n", dest_file_id, referenced_obj_name);
 	        return NULL;
 	    }
+
+	    free(referenced_obj_name);
 	}
     
 	return dest_ref;
@@ -86,6 +88,7 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 
 		        H5Tinsert(data_type, field_name, offset, field_type);
 				memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
+				free(ref_data_dest);
     		} else if (H5Tget_class(field_type) == H5T_COMPOUND) {
 				int nested_num_members = H5Tget_nmembers(field_type);
 
@@ -102,6 +105,7 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 				}
 
 				memcpy(dest_buffer + offset, dest_data, H5Tget_size(field_type));
+				free(dest_data);
     		} else {
     			H5Tinsert(data_type, field_name, offset, field_type);
     			char *value = (char *)src_buffer + offset;
@@ -113,7 +117,7 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 	}
 }
 
-hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int num_elements) {
+hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, int num_elements) {
 	hvl_t *dest_data = malloc(num_elements * sizeof(hvl_t));
 
 	if (H5Tget_class(H5Tget_super(data_type)) == H5T_REFERENCE) {
@@ -123,8 +127,8 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 		    	if (DEBUG)
     				fprintf(log_ptr, "Copying REFERENCE element %d len %ld\n", i, dest_data[i].len);
 
-			    dest_data[i].len = rdata[i].len;
-			 	dest_data[i].p = copy_reference_object(rdata[i].p, rdata[i].len, src_attribute_id);
+			    dest_data[i].len = src_data[i].len;
+			 	dest_data[i].p = copy_reference_object(src_data[i].p, src_data[i].len, src_attribute_id);
 		    }
 		} else if (H5Tequal(H5Tget_super(data_type), H5T_STD_REF_DSETREG)) {
 			// TODO: Add support for dataset region references
@@ -133,11 +137,11 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 		}
 	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_COMPOUND) {
 		for (int i = 0; i < num_elements; i++) {
-			dest_data[i].len = rdata[i].len;
+			dest_data[i].len = src_data[i].len;
 			// Get the size of the compound datatype
 	    	size_t size = H5Tget_size(H5Tget_super(data_type));
 
-	    	hsize_t num_points = rdata[i].len;
+	    	hsize_t num_points = src_data[i].len;
 	    	dest_data[i].p = malloc(size * num_points);
 
 	    	hid_t vlen_element_data_type = H5Tget_super(data_type);
@@ -146,7 +150,7 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
     		if (DEBUG)
     			fprintf(log_ptr, "Copying COMPOUND element %d len %ld members %d\n", i, dest_data[i].len, num_members);
     		
-    		herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, rdata[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
+    		herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_data[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
 
     		if (copy_compound_type_return_value == -1) {
 				return NULL;
@@ -158,9 +162,9 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 	    	if (DEBUG)
     				fprintf(log_ptr, "Copying OTHER element %d len %ld\n", i, dest_data[i].len);
 
-	        for (int j = 0; j < rdata[i].len; j++) {
-	            dest_data[i].len = rdata[i].len;
-	            dest_data[i].p = rdata[i].p;
+	        for (int j = 0; j < src_data[i].len; j++) {
+	            dest_data[i].len = src_data[i].len;
+	            dest_data[i].p = src_data[i].p;
 	        }
 	    }
 	}
@@ -307,6 +311,8 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 
 	        hobj_ref_t *ref_data_dest = copy_reference_object(ref_data_src_file, num_elements, src_attribute_id);
 
+	        free(ref_data_src_file);
+
 	        // Copy the dataspace
 	        hid_t ref_data_dest_dataspace = H5Aget_space(src_attribute_id);   
 	        if (ref_data_dest_dataspace < 0) {
@@ -334,6 +340,8 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
     				fprintf(log_ptr, "Error writing reference to attribute %ld\n", dest_attribute_id);
 	            return -1;
 	        }
+
+	        free(ref_data_dest);
 	    } else if (H5Tequal(attribute_data_type, H5T_STD_REF_DSETREG)) {
 	        // TODO: Add support for dataset region references
 	        if (DEBUG)
@@ -368,6 +376,8 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 
         herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
 
+        free(src_buffer);
+
         if (copy_compound_type_return_value == -1) {
         	return -1;
         }
@@ -401,9 +411,9 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 		if (DEBUG)
     		fprintf(log_ptr, "Copying VLEN attribute %s type %ld %ld elements\n", name_of_attribute, attribute_data_type, dims[0]);
 
-		hvl_t *rdata = (hvl_t *)malloc(dims[0] * sizeof(hvl_t));
+		hvl_t *src_data = (hvl_t *)malloc(dims[0] * sizeof(hvl_t));
 
-		herr_t status = H5Aread(src_attribute_id, attribute_data_type, rdata);
+		herr_t status = H5Aread(src_attribute_id, attribute_data_type, src_data);
 			
 		if (H5Aexists(dest_object_id, name_of_attribute)) {
 			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
@@ -411,7 +421,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 			dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space, H5P_DEFAULT, H5P_DEFAULT);
 		}
 
-		hvl_t *dest_data = copy_vlen_type(src_attribute_id, attribute_data_type, rdata, dims[0]);
+		hvl_t *dest_data = copy_vlen_type(src_attribute_id, attribute_data_type, src_data, dims[0]);
 
 		if (dest_data == NULL) {
 			return -1;
@@ -424,6 +434,15 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
     			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, attribute_data_type);
 	        return write_status;
 	    }
+
+	    if ((H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_COMPOUND) || (H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_REFERENCE)) {
+	    	for (int i = 0; i < dims[0]; i++) {
+	    		free(dest_data[i].p);
+	    	}
+	    }
+
+	    free(dest_data);
+	    free(src_data);
     } else {
     	if (DEBUG)
     		fprintf(log_ptr, "Copying OTHER attribute %s\n", name_of_attribute);
@@ -470,8 +489,11 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
     			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, attribute_data_type);
 			return write_return_val;
 		}
+
+		free(attribute_data_buffer);
     }
 
+    free(name_of_attribute);
 	return 0;
 }
 
@@ -527,14 +549,14 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
     		fprintf(log_ptr, "Error fetching size of name %ld\n", object_id);
 		return -1;
 	}
-
-	// Create and populate buffer for name of object
-    char *object_name = (char *)malloc(size_of_name_buffer);
-    H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
 	// If object is a dataset, make shallow copy of dataset and terminate
 	if (object_type == H5I_DATASET) {
 		hid_t dataset_id, data_type, data_space;
+
+		// Create and populate buffer for name of dataset
+    	char *object_name = (char *)malloc(size_of_name_buffer);
+    	H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill object_name buffer with the name
 
 		// Open the dataset
 		dataset_id = H5Dopen(src_file_id, object_name, H5P_DEFAULT);
@@ -581,6 +603,8 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 
 	    hbool_t is_empty = true;
 	    H5Awrite(attr_id, H5T_NATIVE_HBOOL, &is_empty);
+
+	    free(object_name);
 	// If object is a group, make shallow copy of the group and recursively go down the tree
 	} else if (object_type == H5I_GROUP) {
 		// Create group in destination file
@@ -608,19 +632,20 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved) {
 	char *carved_directory = getenv("CARVED_DIRECTORY");
 
+	char *filename_copy;
+	filename_copy = malloc(strlen(filename) + 1);
+	strcpy(filename_copy, filename);
+
 	if (is_netcdf4 != NULL && use_carved != NULL) {
-		char *filename_copy = malloc(strlen(filename) + 1);
-		strcpy(filename_copy, filename);
 		filename_copy[strlen(filename_copy) - 7] = '\0';
-		filename = filename_copy;
 	}
 
-	const char *filename_without_directory_separators = strrchr(filename, '/');
+	char *filename_without_directory_separators = strrchr(filename_copy, '/');
 
 	if (filename_without_directory_separators != NULL) {
 	        filename_without_directory_separators = filename_without_directory_separators + 1;
 	} else {
-	        filename_without_directory_separators = filename;
+	        filename_without_directory_separators = filename_copy;
 	}
 
 	char *carved_filename;
@@ -644,6 +669,8 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 		strcat(carved_filename, filename_without_directory_separators);
 		strcat(carved_filename, ".carved");
 	}
+
+	free(filename_copy);
 
 	return carved_filename;
 }
