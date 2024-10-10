@@ -44,6 +44,8 @@ int nc_open(const char *path, int omode, int *ncidp) {
 	strcpy(filename, path);
 
 	char *carved_filename = get_carved_filename(filename, NULL, NULL);
+
+	free(filename);
 	
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
@@ -53,6 +55,7 @@ int nc_open(const char *path, int omode, int *ncidp) {
 		return original_nc_open(carved_filename, omode, ncidp);
 	}
 
+	free(carved_filename);
 	return original_nc_open(path, omode, ncidp);
 }
 
@@ -321,6 +324,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 
 	H5Fclose(dataset_src_file);
 	H5Fclose(dataset_carved_file);
+	free(dataset_name);
 	
 	return return_val;
 }
@@ -357,6 +361,7 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
 	    H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
 	    
 	    hid_t original_file_loc_id = original_H5Oopen(original_file_id, parent_object_name, lapl_id);
+	    free(parent_object_name);
 
 	    return_val = original_H5Oopen(original_file_loc_id, name, lapl_id);
 	} else {
@@ -439,7 +444,10 @@ void H5_term_library(void) {
 
 			H5Fclose(src_file_id);
 			H5Fclose(dest_file_id);
+			free(files_opened[i]);
 		}
+
+		free(files_opened);
 	}
 
 	original_H5_term_library = dlsym(RTLD_NEXT, "H5_term_library");
