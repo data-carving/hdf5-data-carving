@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include "H5carve_helper_functions.h"
+#include <string.h>
 
 // Functions being interposed on include H5Fopen, H5Dread, and H5Oopen.
 herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);

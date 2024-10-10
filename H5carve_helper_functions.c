@@ -27,7 +27,7 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	    if (referenced_obj < 0) {
 	    	if (DEBUG)
 	        	fprintf(log_ptr, "Error dereferencing object %ld\n", src_attribute_id);
-	        return referenced_obj;
+	        return NULL;
 	    }
 
 	    // Fetch length of name of dataset
@@ -36,7 +36,7 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	    if (size_of_name_buffer == 0) {
 	        if (DEBUG)
 	        	fprintf(log_ptr, "Error fetching size of dataset name buffer %ld\n", referenced_obj);
-	        return -1;
+	        return NULL;
 	    }
 
 	    // Create and populate buffer for dataset name
@@ -51,14 +51,14 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	    if (ref_dest_creation_return_value < 0) {
 	        if (DEBUG)
 	        	fprintf(log_ptr, "Error creating destination file reference %ld %s\n", dest_file_id, referenced_obj_name);
-	        return ref_dest_creation_return_value;
+	        return NULL;
 	    }
 	}
     
 	return dest_ref;
 }
 
-void copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t data_type, int num_elements, int num_members, size_t starting_offset) {
+herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t data_type, int num_elements, int num_members, size_t starting_offset) {
     for (hsize_t j = 0; j < num_elements; j++) {
     	if (DEBUG)
     		fprintf(log_ptr, "Copying element %ld\n", j);
@@ -80,15 +80,27 @@ void copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t
     			// TODO add check for REF_OBJ and DSET_REGION
         		hobj_ref_t *ref_data_dest = copy_reference_object(src_buffer + offset, 1, src_id);
 
+        		if (ref_data_dest == NULL) {
+        			return -1;
+        		}
+
 		        H5Tinsert(data_type, field_name, offset, field_type);
 				memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
     		} else if (H5Tget_class(field_type) == H5T_COMPOUND) {
 				int nested_num_members = H5Tget_nmembers(field_type);
 
-    			copy_compound_type(src_id, src_buffer, dest_buffer, field_type, 1, nested_num_members, offset);
+    			herr_t copy_compound_type_return_value = copy_compound_type(src_id, src_buffer, dest_buffer, field_type, 1, nested_num_members, offset);
+
+    			if (copy_compound_type_return_value == -1) {
+    				return -1;
+    			}
     		} else if (H5Tget_class(field_type) == H5T_VLEN) {
 				hvl_t *dest_data = copy_vlen_type(src_id, field_type, (hvl_t *)(src_buffer + offset), 1);
 				
+				if (dest_data == NULL) {
+					return -1;
+				}
+
 				memcpy(dest_buffer + offset, dest_data, H5Tget_size(field_type));
     		} else {
     			H5Tinsert(data_type, field_name, offset, field_type);
@@ -112,12 +124,12 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
     				fprintf(log_ptr, "Copying REFERENCE element %d len %ld\n", i, dest_data[i].len);
 
 			    dest_data[i].len = rdata[i].len;
-			 	dest_data[i].p = copy_reference_object(rdata[i].p, rdata[i].len, src_attribute_id);   
+			 	dest_data[i].p = copy_reference_object(rdata[i].p, rdata[i].len, src_attribute_id);
 		    }
 		} else if (H5Tequal(H5Tget_super(data_type), H5T_STD_REF_DSETREG)) {
 			// TODO: Add support for dataset region references
         	printf("Dataset region references not supported yet.\n");
-        	return -1;
+        	return NULL;
 		}
 	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_COMPOUND) {
 		for (int i = 0; i < num_elements; i++) {
@@ -134,7 +146,11 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
     		if (DEBUG)
     			fprintf(log_ptr, "Copying COMPOUND element %d len %ld members %d\n", i, dest_data[i].len, num_members);
     		
-    		copy_compound_type(src_attribute_id, rdata[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
+    		herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, rdata[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
+
+    		if (copy_compound_type_return_value == -1) {
+				return NULL;
+			}
 		}
 	} else {
 		// Process the VLEN data
@@ -165,9 +181,9 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 	}
 
 	// Fetch id of parent object
-	hid_t *dest_parent_object_id = *(hid_t *)opdata;
+	hid_t dest_parent_object_id = *(hid_t *)opdata;
 	
-	if (dest_parent_object_id == NULL) {
+	if (dest_parent_object_id < 0) {
 		printf("Error due to NULL destination file parent object\n");
 		return -1;
 	}
@@ -184,7 +200,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		hid_t dest_object_id = H5Dopen(dest_parent_object_id, name, H5P_DEFAULT);
 
 		if (dest_object_id < 0) {
-			printf("Error opening dest object %ln %s\n", dest_parent_object_id, name);
+			printf("Error opening dest object %ld %s\n", dest_parent_object_id, name);
 			return object_id;
 		}
 
@@ -199,7 +215,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 		hid_t dest_object_id = original_H5Oopen(dest_parent_object_id, name, H5P_DEFAULT);
 
 		if (dest_object_id < 0) {
-			printf("Error opening dest object %ln %s\n", dest_parent_object_id, name);
+			printf("Error opening dest object %ld %s\n", dest_parent_object_id, name);
 			return object_id;
 		}
 
@@ -225,7 +241,7 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 
 herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
-	hid_t *dest_object_id = *(hid_t *)opdata;
+	hid_t dest_object_id = *(hid_t *)opdata;
 
 	if (dest_object_id == NULL) {
 		return -1;
@@ -308,7 +324,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 
 	        if (dest_attribute_id < 0) {
 	            if (DEBUG)
-    				fprintf(log_ptr, "Error creating destination file attribute %ln %s %ld\n", dest_object_id, name_of_attribute, ref_data_dest_dataspace);
+    				fprintf(log_ptr, "Error creating destination file attribute %ld %s %ld\n", dest_object_id, name_of_attribute, ref_data_dest_dataspace);
 	            return -1;
 	        }
 
@@ -350,7 +366,11 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
     	if (DEBUG)
     		fprintf(log_ptr, "Copying COMPOUND attribute %s %ld elements %d members\n", name_of_attribute, num_points, num_members);
 
-        copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
+        herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_buffer, dest_buffer, attribute_data_type, num_points, num_members, 0);
+
+        if (copy_compound_type_return_value == -1) {
+        	return -1;
+        }
 
         if (H5Aexists(dest_object_id, name_of_attribute)) {
         	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
@@ -360,7 +380,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 
 	    if (dest_attribute_id < 0) {
 			if (DEBUG)
-    			fprintf(log_ptr, "Error creating attribute %ln %s %ld %ld\n", dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space);
+    			fprintf(log_ptr, "Error creating attribute %ld %s %ld %ld\n", dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space);
 			return dest_attribute_id;
 		}
 
@@ -392,6 +412,10 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 		}
 
 		hvl_t *dest_data = copy_vlen_type(src_attribute_id, attribute_data_type, rdata, dims[0]);
+
+		if (dest_data == NULL) {
+			return -1;
+		}
 
 	    herr_t write_status = H5Awrite(dest_attribute_id, attribute_data_type, dest_data);
 	    
@@ -434,7 +458,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 		
 		if (dest_attribute_id < 0) {
 			if (DEBUG)
-    			fprintf(log_ptr, "Error creating attribute %ln %s %ld %ld\n", dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space);
+    			fprintf(log_ptr, "Error creating attribute %ld %s %ld %ld\n", dest_object_id, name_of_attribute, attribute_data_type, attribute_data_space);
 			return dest_attribute_id;
 		}
 
