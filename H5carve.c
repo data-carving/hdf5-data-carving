@@ -387,7 +387,6 @@ void H5_term_library(void) {
 			if (src_file_id == H5I_INVALID_HID) {
 				if (DEBUG)
 					fprintf(log_ptr, "Error reopening source file for copying attributes %s\n", files_opened[i]);
-				return src_file_id;
 			}
 
 			// Create name of carved file
@@ -403,7 +402,6 @@ void H5_term_library(void) {
 			if (dest_file_id == H5I_INVALID_HID) {
 				if (DEBUG)
 					fprintf(log_ptr, "Error reopening dest file for copying attributes %s\n", carved_filename);
-				return dest_file_id;
 			}
 
 			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);	
@@ -411,7 +409,6 @@ void H5_term_library(void) {
 			if (original_file_group_location_id == H5I_INVALID_HID) {
 				if (DEBUG)
 					fprintf(log_ptr, "Error opening source file root group %ld\n", src_file_id);
-				return H5I_INVALID_HID;
 			}
 
 			hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
@@ -419,7 +416,6 @@ void H5_term_library(void) {
 			if (carved_file_group_location_id == H5I_INVALID_HID) {
 				if (DEBUG)
 					fprintf(log_ptr, "Error opening carved file root group %ld\n", dest_file_id);
-				return H5I_INVALID_HID;
 			}
 
 			if (DEBUG)
@@ -431,7 +427,6 @@ void H5_term_library(void) {
 			if (attribute_iterate_return_val < 0) {
 				if (DEBUG)
 					fprintf(log_ptr, "Attribute iteration failed\n");
-				return attribute_iterate_return_val;
 			}
 
 			// Start DFS to make a copy of attributes
@@ -440,7 +435,6 @@ void H5_term_library(void) {
 			if (link_iterate_return_val < 0) {
 				if (DEBUG)
 					fprintf(log_ptr, "Link iteration failed\n");
-				return H5I_INVALID_HID;
 			}
 
 			H5Fclose(src_file_id);
