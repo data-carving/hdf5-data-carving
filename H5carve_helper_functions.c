@@ -168,7 +168,7 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *rdata, int
 	return dest_data;
 }	
 
-herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *ainfo, void *opdata) {
 	if (DEBUG)
 		fprintf(log_ptr, "Copying attributes of object %s\n", name);
 	// Open the object
@@ -239,11 +239,11 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, 
 	return 0;
 }
 
-herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *linfo, void *opdata) {
 	hid_t dest_attribute_id, attribute_data_type, attribute_data_space;
 	hid_t dest_object_id = *(hid_t *)opdata;
 
-	if (dest_object_id == NULL) {
+	if (dest_object_id < 0) {
 		return -1;
 	}
 
@@ -475,7 +475,7 @@ herr_t copy_object_attributes(hid_t loc_id, const char *name, const H5L_info_t *
 	return 0;
 }
 
-herr_t delete_attributes(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata) {
+herr_t delete_attributes(hid_t loc_id, const char *name, const H5A_info_t *ainfo, void *opdata) {
 	herr_t status = H5Adelete(loc_id, name);
 
 	if (status < 0) {
