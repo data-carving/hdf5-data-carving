@@ -257,7 +257,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	}
 
 	// Fetch length of name of attribute
-	int size_of_name_buffer = H5Aget_name(src_attribute_id, NULL, 0) + 1;
+	int size_of_name_buffer = H5Aget_name(src_attribute_id, 0, 0) + 1;
 
 	if (size_of_name_buffer < 0) {
 		if (DEBUG)
@@ -529,7 +529,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	}
 
 	// Create and populate buffer for name of object
-    const char *object_name = (char *)malloc(size_of_name_buffer);
+    char *object_name = (char *)malloc(size_of_name_buffer);
     H5Iget_name(object_id, object_name, size_of_name_buffer); // Fill dataset_name buffer with the object name
 	
 	// If object is a dataset, make shallow copy of dataset and terminate
@@ -615,7 +615,7 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 		filename = filename_copy;
 	}
 
-	char *filename_without_directory_separators = strrchr(filename, '/');
+	const char *filename_without_directory_separators = strrchr(filename, '/');
 
 	if (filename_without_directory_separators != NULL) {
 	        filename_without_directory_separators = filename_without_directory_separators + 1;
@@ -674,7 +674,7 @@ bool does_dataset_exist(hid_t dataset_id) {
 	return !(is_empty == true);
 }
 
-bool is_already_recorded(char *filename) {
+bool is_already_recorded(const char *filename) {
 	for (int i = 0; i < files_opened_current_size; i++) {
 		if (strcmp(files_opened[i], filename) == 0) {
 			return true;
