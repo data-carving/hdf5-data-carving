@@ -243,33 +243,7 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
-	if (is_netcdf4 != NULL && use_carved != NULL) {
-		char *filename_copy = malloc(strlen(dataset_filename) + 1);
-		strcpy(filename_copy, dataset_filename);
-		filename_copy[strlen(filename_copy) - 7] = '\0';
-		dataset_filename = filename_copy;
-	}
-
-	char *filename_without_directory_separators = strrchr(dataset_filename, '/');
-    
-    if (filename_without_directory_separators != NULL) {
-            filename_without_directory_separators = filename_without_directory_separators + 1;
-    } else {
-            filename_without_directory_separators = dataset_filename;
-    }
-
-	char carved_filename[(carved_directory == NULL ? strlen(dataset_filename) : strlen(carved_directory) + strlen(filename_without_directory_separators)) + 7 + 1];
-
-	if (carved_directory == NULL) {
-	    carved_filename[0] = '\0';
-		strcat(carved_filename, dataset_filename);
-		strcat(carved_filename, ".carved");	
-	} else {
-		carved_filename[0] = '\0';
-		strcat(carved_filename, carved_directory);
-		strcat(carved_filename, filename_without_directory_separators);
-		strcat(carved_filename, ".carved");
-	}
+	char *carved_filename = get_carved_filename(dataset_filename, is_netcdf4, use_carved);
 	
 	original_H5Fopen = dlsym(RTLD_NEXT, "H5Fopen");
 	hid_t dataset_src_file = original_H5Fopen(dataset_filename, H5F_ACC_RDONLY, H5P_DEFAULT);
