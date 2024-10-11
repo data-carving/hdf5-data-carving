@@ -20,6 +20,7 @@ extern char *DEBUG;
 hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
 	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));
 
+	// Iterate over all elements in the reference attribute
 	for (int i = 0; i < num_elements; i++) {
 		// Process the reference data
 	    hid_t referenced_obj = H5Rdereference1(src_attribute_id, H5R_OBJECT, (source_ref + i)); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
@@ -30,7 +31,7 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	        return NULL;
 	    }
 
-	    // Fetch length of name of dataset
+	    // Fetch length of name of referenced object
 	    int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
 	    if (size_of_name_buffer == 0) {
@@ -39,13 +40,14 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	        return NULL;
 	    }
 
-	    // Create and populate buffer for dataset name
+	    // Create and populate buffer for object name
 	    char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
 	    H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
 
 	    if (DEBUG)
 	        fprintf(log_ptr, "Creating reference to object %s\n", referenced_obj_name);
 
+	    // Create reference in the carved file
 	    herr_t ref_dest_creation_return_value = H5Rcreate((dest_ref + i), dest_file_id, referenced_obj_name, H5R_OBJECT, -1);
 
 	    if (ref_dest_creation_return_value < 0) {
@@ -61,10 +63,12 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 }
 
 herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid_t data_type, int num_elements, int num_members, size_t starting_offset) {
+	// Iterate over all elements in the compound attribute
     for (hsize_t j = 0; j < num_elements; j++) {
     	if (DEBUG)
     		fprintf(log_ptr, "Copying element %ld\n", j);
 
+    	// Iterate over all members in an element
 		for (int i = 0; i < num_members; i++) {
 			if (DEBUG)
     			fprintf(log_ptr, "Copying member %d\n", i);
@@ -73,11 +77,14 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
     		size_t field_offset = H5Tget_member_offset(data_type, i);
     		hid_t field_type = H5Tget_member_type(data_type, i);
 
+    		// Get the precise offset of the member, depending on the starting offset of the compound type. 
+    		// Starting offset is 0 for the root compound type. For nested compound types, it is the field_offset of the parent compound type.
     		size_t offset = starting_offset + field_offset;
 
     		if (DEBUG)
     			fprintf(log_ptr, "Field name %s Field offset %ld Field type %d\n", field_name, field_offset, H5Tget_class(field_type));
 
+    		// Check datatype class of each datatype
     		if (H5Tget_class(field_type) == H5T_REFERENCE) {
     			// TODO add check for REF_OBJ and DSET_REGION
         		hobj_ref_t *ref_data_dest = copy_reference_object(src_buffer + offset, 1, src_id);
@@ -86,12 +93,17 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
         			return -1;
         		}
 
+        		// Add member to the compound datatype in carved file
 		        H5Tinsert(data_type, field_name, offset, field_type);
+
+		        // Copy data to the offset of the member in destination buffer
 				memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
 				free(ref_data_dest);
     		} else if (H5Tget_class(field_type) == H5T_COMPOUND) {
+    			// Get number of members for the nested compound datatype member
 				int nested_num_members = H5Tget_nmembers(field_type);
 
+				// Copy nested compound datatype member recursively
     			herr_t copy_compound_type_return_value = copy_compound_type(src_id, src_buffer, dest_buffer, field_type, 1, nested_num_members, offset);
 
     			if (copy_compound_type_return_value == -1) {
@@ -104,15 +116,23 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 					return -1;
 				}
 
+				// Copy data to the offset of the member in destination buffer
 				memcpy(dest_buffer + offset, dest_data, H5Tget_size(field_type));
 				free(dest_data);
     		} else {
     			H5Tinsert(data_type, field_name, offset, field_type);
+
+    			// Traverse to the appropriate offset in the source buffer 
     			char *value = (char *)src_buffer + offset;
+
+    			// Copy data to the offset of the member in destination buffer
 				memcpy(dest_buffer + offset, value, H5Tget_size(field_type));
     		}
 		}
 
+		// Increment the starting offset by the size of each element of the compound datatype. 
+		// Each element of a compound datatype is positioned at an offset that is a multiple of its position in the compound datatype. 
+		// The offset of each element is the size of the compound datatype.
     	starting_offset += (H5Tget_size(data_type));
 	}
 }
@@ -120,6 +140,7 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, int num_elements) {
 	hvl_t *dest_data = malloc(num_elements * sizeof(hvl_t));
 
+	// Check datatype class of each datatype
 	if (H5Tget_class(H5Tget_super(data_type)) == H5T_REFERENCE) {
 		if (H5Tequal(H5Tget_super(data_type), H5T_STD_REF_OBJ)) {
 			// Process the VLEN data
@@ -127,6 +148,7 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 		    	if (DEBUG)
     				fprintf(log_ptr, "Copying REFERENCE element %d len %ld\n", i, dest_data[i].len);
 
+    			// Create carved version of the ith element of the hvl_t struct
 			    dest_data[i].len = src_data[i].len;
 			 	dest_data[i].p = copy_reference_object(src_data[i].p, src_data[i].len, src_attribute_id);
 		    }
@@ -137,20 +159,24 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 		}
 	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_COMPOUND) {
 		for (int i = 0; i < num_elements; i++) {
-			dest_data[i].len = src_data[i].len;
 			// Get the size of the compound datatype
 	    	size_t size = H5Tget_size(H5Tget_super(data_type));
 
-	    	hsize_t num_points = src_data[i].len;
-	    	dest_data[i].p = malloc(size * num_points);
+	    	// Number of elements of the compound datatype is equal to the length of each hvl_t struct
+	    	hsize_t num_elements = src_data[i].len;
 
+	    	// Create carved version of the ith element of the hvl_t struct
+	    	dest_data[i].len = src_data[i].len;
+	    	dest_data[i].p = malloc(size * num_elements);
+
+	    	// Get number of members in the compound datatype
 	    	hid_t vlen_element_data_type = H5Tget_super(data_type);
     		int num_members = H5Tget_nmembers(vlen_element_data_type);
     		
     		if (DEBUG)
     			fprintf(log_ptr, "Copying COMPOUND element %d len %ld members %d\n", i, dest_data[i].len, num_members);
     		
-    		herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_data[i].p, dest_data[i].p, vlen_element_data_type, num_points, num_members, 0);
+    		herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_data[i].p, dest_data[i].p, vlen_element_data_type, num_elements, num_members, 0);
 
     		if (copy_compound_type_return_value == -1) {
 				return NULL;
@@ -162,7 +188,9 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 	    	if (DEBUG)
     				fprintf(log_ptr, "Copying OTHER element %d len %ld\n", i, dest_data[i].len);
 
+    		// Iterate over each element of the hvl_t struct
 	        for (int j = 0; j < src_data[i].len; j++) {
+	    		// Create carved version of the ith element of the hvl_t struct
 	            dest_data[i].len = src_data[i].len;
 	            dest_data[i].p = src_data[i].p;
 	        }
@@ -200,6 +228,9 @@ herr_t copy_attributes(hid_t loc_id, const char *name, const H5L_info_t *ainfo, 
 		return object_type;
 	}
 
+	// Check object type. 
+	// Groups can be leaf nodes as well as subtrees whereas datasets can only be leaf nodes. 
+	// Continue traversing the graph in case of groups.
 	if (object_type == H5I_DATASET) {
 		hid_t dest_object_id = H5Dopen(dest_parent_object_id, name, H5P_DEFAULT);
 
@@ -268,6 +299,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
     		fprintf(log_ptr, "Error fetching attribute name %ld\n", src_attribute_id);
 		return size_of_name_buffer;
 	}
+
 	// Create and populate buffer for attribute name
 	char *name_of_attribute = (char *)malloc(size_of_name_buffer);
 	H5Aget_name(src_attribute_id, size_of_name_buffer, name_of_attribute);
@@ -304,7 +336,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	        return read_return_val;
 	    }
 
-	    // Currently, supports only object references, and not dataset region references
+	    // Currently, supports only object references and not dataset region references
 	    if (H5Tequal(attribute_data_type, H5T_STD_REF_OBJ)) {
 	    	if (DEBUG)
     			fprintf(log_ptr, "Copying REFERENCE attribute %s type %ld %ld elements\n", name_of_attribute, H5T_STD_REF_OBJ, num_elements);
@@ -321,10 +353,10 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	            return -1;
 	        }
 
+	        // If attribute already exists, open the existing attribute. Otherwise, create the attribute.
 	        if (H5Aexists(dest_object_id, name_of_attribute)) {
 	        	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
 	        } else {
-	        	// Create the attribute and write the reference
 	        	dest_attribute_id = H5Acreate2(dest_object_id, name_of_attribute, H5T_STD_REF_OBJ, ref_data_dest_dataspace, H5P_DEFAULT, H5P_DEFAULT);
 	        }
 
@@ -369,6 +401,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	    // Allocate buffer to read the attribute
 	    void *dest_buffer = malloc(size * num_points);
 
+	    // Get number of members in the compound datatype
     	int num_members = H5Tget_nmembers(attribute_data_type);
 
     	if (DEBUG)
@@ -382,6 +415,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
         	return -1;
         }
 
+	    // If attribute already exists, open the existing attribute. Otherwise, create the attribute.
         if (H5Aexists(dest_object_id, name_of_attribute)) {
         	dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
         } else {
@@ -411,10 +445,12 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 		if (DEBUG)
     		fprintf(log_ptr, "Copying VLEN attribute %s type %ld %ld elements\n", name_of_attribute, attribute_data_type, dims[0]);
 
+    	// Allocate memory to read VLEN data
 		hvl_t *src_data = (hvl_t *)malloc(dims[0] * sizeof(hvl_t));
 
 		herr_t status = H5Aread(src_attribute_id, attribute_data_type, src_data);
-			
+		
+	    // If attribute already exists, open the existing attribute. Otherwise, create the attribute.
 		if (H5Aexists(dest_object_id, name_of_attribute)) {
 			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
 		} else {
@@ -632,33 +668,44 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved) {
 	char *carved_directory = getenv("CARVED_DIRECTORY");
 
+	// Make a copy of the filename.
 	char *filename_copy;
 	filename_copy = malloc(strlen(filename) + 1);
 	strcpy(filename_copy, filename);
 
+	// If original file is a netCDF4 file and tool is being used in re-execution mode, interposed nc_open returns filename with the .carved suffix.
 	if (is_netcdf4 != NULL && use_carved != NULL) {
 		filename_copy[strlen(filename_copy) - 7] = '\0';
 	}
 
-	char *filename_without_directory_separators = strrchr(filename_copy, '/');
+	// Traverse the file path to get to the last occurrence of directory separtors to get to name of the file
+	char *filename_without_directories = strrchr(filename_copy, '/');
 
-	if (filename_without_directory_separators != NULL) {
-	        filename_without_directory_separators = filename_without_directory_separators + 1;
+	// If there are no directory separators in filename, strrchr returns NULL. 
+	// If it has returned NULL, replace variable back with the filename. 
+	// Otherwise, increment by 1 to skip the last directory separator
+	if (filename_without_directories != NULL) {
+	        filename_without_directories = filename_without_directories + 1;
 	} else {
-	        filename_without_directory_separators = filename_copy;
+	        filename_without_directories = filename_copy;
 	}
 
 	char *carved_filename;
 	int carved_filename_length_without_suffix;
 
+	// If no directory is specified for the carved files, the length of the carved file directory path does not need to be considered.
+	// If a directory is specified for the carved files, the length of the carved file directory path needs to be included when allocating memory.
 	if (carved_directory == NULL) {
 		carved_filename_length_without_suffix = strlen(filename);
 	} else {
-		carved_filename_length_without_suffix = strlen(carved_directory) + strlen(filename_without_directory_separators);
+		carved_filename_length_without_suffix = strlen(carved_directory) + strlen(filename_without_directories);
 	}
 
 	carved_filename = (char *)malloc(carved_filename_length_without_suffix + 7 + 1); // 7 + 1 is for the suffix .carved and null terminating character
 
+	// Construct the path of the carved file.
+	// If no directory for carved files is specified, carved files are created in the same location as the original files.
+	// If a directory for carved files is specified, carved files are created in the specified directory. 
 	if (carved_directory == NULL) {
 	    carved_filename[0] = '\0';
 		strcat(carved_filename, filename);
@@ -666,7 +713,7 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 	} else {
 		carved_filename[0] = '\0';
 		strcat(carved_filename, carved_directory);
-		strcat(carved_filename, filename_without_directory_separators);
+		strcat(carved_filename, filename_without_directories);
 		strcat(carved_filename, ".carved");
 	}
 
@@ -676,6 +723,7 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 }
 
 bool does_dataset_exist(hid_t dataset_id) {
+	// If the CARVED_DATASET_IS_EMPTY attribute does not exist, the dataset is not empty.
 	if (!H5Aexists(dataset_id, "CARVED_DATASET_IS_EMPTY")) {
 		return true;
 	}
