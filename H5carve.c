@@ -121,8 +121,8 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	// Record files that have been opened for copying attributes if not already recorded
 	if (!is_already_recorded(filename)) {
-		// Record files that have been opened for copying attributes
 		if (files_opened == NULL) {
 	        files_opened = malloc((files_opened_current_size + 1) * sizeof(char*));
 	    } else {
