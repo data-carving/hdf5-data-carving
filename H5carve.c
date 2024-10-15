@@ -177,6 +177,14 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
+	herr_t fallback_metadata_ret_val = create_fallback_metadata(filename, destination_group_location_id);
+
+	if (fallback_metadata_ret_val < 0) {
+		if (DEBUG)
+			fprintf(log_ptr, "Error creating fallback metadata");
+		return fallback_metadata_ret_val;
+	}
+
 	if (DEBUG)
 		fprintf(log_ptr, "CARVING GROUPS AND EMPTY DATASETS\n");
 
@@ -333,7 +341,7 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
 	   	// Create and populate buffer for dataset name
 	    char *parent_object_name = (char *)malloc(size_of_name_buffer);
 	    H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
-	    
+
 	    hid_t original_file_loc_id = original_H5Oopen(original_file_id, parent_object_name, lapl_id);
 	    free(parent_object_name);
 

@@ -11,5 +11,6 @@ bool is_already_recorded(const char *filename);
 herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *linfo, void *opdata);
 char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carved);
 bool does_dataset_exist(hid_t dataset_id);
+herr_t create_fallback_metadata(const char *filename, hid_t destination_root_group);
 
 #endif

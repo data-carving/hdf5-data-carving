@@ -17,6 +17,11 @@ extern int files_opened_current_size;
 extern FILE *log_ptr;
 extern char *DEBUG;
 
+typedef enum {
+    LOCAL,
+    REMOTE,
+} fallback_enum;
+
 hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
 	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));
 
@@ -757,4 +762,47 @@ bool is_already_recorded(const char *filename) {
 	}
 
 	return false;
+}
+
+herr_t create_fallback_metadata(const char *filename, hid_t destination_root_group) {
+	hsize_t dims[1] = {1};
+	hid_t fallback_attribute_dataspace = H5Screate(H5S_SIMPLE);
+    H5Sset_extent_simple(fallback_attribute_dataspace, 1, dims, dims);
+    char file_absolute_path[PATH_MAX];
+    realpath(filename, file_absolute_path);
+    int file_absolute_path_length = strlen(file_absolute_path);
+
+    hid_t fallback_compound_type = H5Tcreate(H5T_COMPOUND, sizeof(fallback_enum) + file_absolute_path_length);
+
+    hid_t enum_type = H5Tcreate(H5T_ENUM, sizeof(fallback_enum));
+
+    int enum_value;
+    enum_value = LOCAL;
+    H5Tenum_insert(enum_type, "LOCAL", &enum_value);
+    enum_value = REMOTE;
+    H5Tenum_insert(enum_type, "REMOTE", &enum_value);
+
+    H5Tinsert(fallback_compound_type, "FALLBACK_TYPE", 0, enum_type);
+    
+    hid_t string_dtype = H5Tcopy(H5T_C_S1);
+    H5Tset_size (string_dtype, file_absolute_path_length);
+    H5Tinsert(fallback_compound_type, "PATH", sizeof(fallback_enum), string_dtype);
+
+	hid_t dest_fallback_attribute_id = H5Acreate2(destination_root_group, "FALLBACK_METADATA", fallback_compound_type, fallback_attribute_dataspace, H5P_DEFAULT, H5P_DEFAULT);
+
+	fallback_enum value = LOCAL;
+	void *buffer = malloc(sizeof(fallback_enum) + file_absolute_path_length);
+	
+	memcpy(buffer, &value, sizeof(fallback_enum));
+	memcpy(buffer + sizeof(fallback_enum), file_absolute_path, file_absolute_path_length);
+
+	herr_t write_return_val = H5Awrite(dest_fallback_attribute_id, fallback_compound_type, buffer);
+	
+    if (write_return_val < 0) {
+		if (DEBUG)
+			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_fallback_attribute_id, fallback_compound_type);
+		return write_return_val;
+	}
+
+	return 0;
 }
