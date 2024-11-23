@@ -185,6 +185,14 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return fallback_metadata_ret_val;
 	}
 
+    hid_t dataset_copy_check_attr_dataspace_id = H5Screate(H5S_SCALAR);
+
+    hid_t dataset_copy_check_attr_id = H5Acreate2(destination_group_location_id, "WAS_DATASET_COPIED", H5T_NATIVE_HBOOL, dataset_copy_check_attr_dataspace_id, 
+                               H5P_DEFAULT, H5P_DEFAULT);
+
+    hbool_t is_empty = false;
+    H5Awrite(dataset_copy_check_attr_id, H5T_NATIVE_HBOOL, &is_empty);
+
 	if (DEBUG)
 		fprintf(log_ptr, "CARVING GROUPS AND EMPTY DATASETS\n");
 
@@ -284,6 +292,24 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 				fprintf(log_ptr, "Error copying object %ld %s %ld %s\n", dataset_src_file, dataset_name, dataset_carved_file, dataset_name);
 			return object_copy_return_val;
 		}
+
+		hid_t dataset_copy_check_attr_id = H5Aopen(dataset_carved_file, "WAS_DATASET_COPIED", H5P_DEFAULT);
+
+		if (dataset_copy_check_attr_id < 0) {
+            if (DEBUG)
+				fprintf(log_ptr, "Error opening dataset copy check attribute %ld\n", dataset_carved_file);
+            return -1;
+        }
+
+		hbool_t dataset_copy_check_attr_val = true;
+
+        herr_t dataset_copy_check_attr_write_status = H5Awrite(dataset_copy_check_attr_id, H5T_NATIVE_HBOOL, &dataset_copy_check_attr_val);
+        
+        if (dataset_copy_check_attr_write_status < 0) {
+            if (DEBUG)
+				fprintf(log_ptr, "Error writing value to dataset copy check ttribute %ld\n", dataset_copy_check_attr_id);
+            return -1;
+        }
 
 		original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
 		hid_t recent = original_H5Oopen(dataset_carved_file, dataset_name, H5P_DEFAULT);
@@ -391,37 +417,67 @@ void H5_term_library(void) {
 					fprintf(log_ptr, "Error reopening dest file for copying attributes %s\n", carved_filename);
 			}
 
-			hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);	
+			hid_t dataset_copy_check_attr_id = H5Aopen(dest_file_id, "WAS_DATASET_COPIED", H5P_DEFAULT);
 
-			if (original_file_group_location_id == H5I_INVALID_HID) {
+			if (dataset_copy_check_attr_id < 0) {
+	            if (DEBUG)
+					fprintf(log_ptr, "Error opening dataset copy check attribute %ld\n", dest_file_id);
+	            return -1;
+	        }
+
+	        hbool_t dataset_copy_check_attr_val;
+	        
+			herr_t dataset_copy_check_attr_return_val = H5Aread(dataset_copy_check_attr_id, H5T_NATIVE_HBOOL, &dataset_copy_check_attr_val);
+
+			if (dataset_copy_check_attr_return_val < 0) {
 				if (DEBUG)
-					fprintf(log_ptr, "Error opening source file root group %ld\n", src_file_id);
+	    			fprintf(log_ptr, "Error reading dataset copy check attribute data %ld\n", dataset_copy_check_attr_id);
+				return dataset_copy_check_attr_return_val;
 			}
 
-			hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+			if (dataset_copy_check_attr_val == true) {
+				printf("HIT\n");
+				hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);	
 
-			if (carved_file_group_location_id == H5I_INVALID_HID) {
+				if (original_file_group_location_id == H5I_INVALID_HID) {
+					if (DEBUG)
+						fprintf(log_ptr, "Error opening source file root group %ld\n", src_file_id);
+				}
+
+				hid_t carved_file_group_location_id = H5Gopen(dest_file_id, "/", H5P_DEFAULT);
+
+				if (carved_file_group_location_id == H5I_INVALID_HID) {
+					if (DEBUG)
+						fprintf(log_ptr, "Error opening carved file root group %ld\n", dest_file_id);
+				}
+
 				if (DEBUG)
-					fprintf(log_ptr, "Error opening carved file root group %ld\n", dest_file_id);
-			}
+					fprintf(log_ptr, "CARVING ATTRIBUTES\n");
 
-			if (DEBUG)
-				fprintf(log_ptr, "CARVING ATTRIBUTES\n");
+				// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
+				herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
+				
+				if (attribute_iterate_return_val < 0) {
+					if (DEBUG)
+						fprintf(log_ptr, "Attribute iteration failed\n");
+				}
 
-			// Iterate over attributes at this level in the source file and make non-shallow copies in the destination file
-			herr_t attribute_iterate_return_val = H5Aiterate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_object_attributes, &carved_file_group_location_id); // Iterate through each attribute and create a copy
-			
-			if (attribute_iterate_return_val < 0) {
-				if (DEBUG)
-					fprintf(log_ptr, "Attribute iteration failed\n");
-			}
+				// Start DFS to make a copy of attributes
+				herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
 
-			// Start DFS to make a copy of attributes
-			herr_t link_iterate_return_val = H5Literate2(original_file_group_location_id, H5_INDEX_NAME, H5_ITER_INC, NULL, copy_attributes, &carved_file_group_location_id);
+				if (link_iterate_return_val < 0) {
+					if (DEBUG)
+						fprintf(log_ptr, "Link iteration failed\n");
+				}
 
-			if (link_iterate_return_val < 0) {
-				if (DEBUG)
-					fprintf(log_ptr, "Link iteration failed\n");
+				dataset_copy_check_attr_val = false;
+
+		        herr_t dataset_copy_check_attr_write_status = H5Awrite(dataset_copy_check_attr_id, H5T_NATIVE_HBOOL, &dataset_copy_check_attr_val);
+		        if (dataset_copy_check_attr_write_status < 0) {
+		            if (DEBUG)
+						fprintf(log_ptr, "Error writing value to dataset copy check ttribute %ld\n", dataset_copy_check_attr_id);
+		            return -1;
+		        }
 			}
 
 			H5Fclose(src_file_id);
