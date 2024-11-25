@@ -1,26 +1,11 @@
 #define _GNU_SOURCE
 #include "hdf5.h"
+#include "netcdf.h"
+#include "H5carve.h"
 #include "H5carve_helper_functions.h"
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
-
-herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
-hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
-
-extern hid_t src_file_id;
-extern hid_t dest_file_id;
-extern char *use_precarved;
-extern hid_t original_file_id;
-extern char **files_opened;
-extern int files_opened_current_size;
-extern FILE *log_ptr;
-extern char *DEBUG;
-
-typedef enum {
-    LOCAL,
-    REMOTE,
-} fallback_enum;
 
 hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
 	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));

@@ -1,27 +1,18 @@
 #define _GNU_SOURCE
 #include "hdf5.h"
 #include "netcdf.h"
+#include "H5carve.h"
+#include "H5carve_helper_functions.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <dlfcn.h>
-#include "H5carve_helper_functions.h"
 #include <string.h>
 
-// Functions being interposed on include H5Fopen, H5Dread, and H5Oopen.
-herr_t (*original_H5Dread)(hid_t, hid_t, hid_t, hid_t, hid_t, void*);
-hid_t (*original_H5Fopen)(const char *, unsigned, hid_t);
-hid_t (*original_H5Oopen)(hid_t, const char *, hid_t);
-int (*original_nc_open)(const char *path, int omode, int *ncidp);
-void (*original_H5_term_library)(void);
-
-// Global variables to be used across function calls
-char *use_carved;
 // File IDs are set to -1 to check if they have been set
 hid_t src_file_id = -1;
 hid_t dest_file_id = -1;
 hid_t original_file_id = -1;
-char *is_netcdf4; // TODO: replace with an robust automatic check i.e. some kind of byte encoding 
 char **files_opened = NULL;
 int files_opened_current_size = 0;
 FILE *log_ptr = NULL;

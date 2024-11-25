@@ -13,4 +13,9 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 bool does_dataset_exist(hid_t dataset_id);
 herr_t create_fallback_metadata(const char *filename, hid_t destination_root_group);
 
+typedef enum {
+    LOCAL,
+    REMOTE,
+} fallback_enum;
+
 #endif
