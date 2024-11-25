@@ -422,7 +422,6 @@ void H5_term_library(void) {
 			if (dataset_copy_check_attr_id < 0) {
 	            if (DEBUG)
 					fprintf(log_ptr, "Error opening dataset copy check attribute %ld\n", dest_file_id);
-	            return -1;
 	        }
 
 	        hbool_t dataset_copy_check_attr_val;
@@ -432,11 +431,9 @@ void H5_term_library(void) {
 			if (dataset_copy_check_attr_return_val < 0) {
 				if (DEBUG)
 	    			fprintf(log_ptr, "Error reading dataset copy check attribute data %ld\n", dataset_copy_check_attr_id);
-				return dataset_copy_check_attr_return_val;
 			}
 
 			if (dataset_copy_check_attr_val == true) {
-				printf("HIT\n");
 				hid_t original_file_group_location_id = H5Gopen(src_file_id, "/", H5P_DEFAULT);	
 
 				if (original_file_group_location_id == H5I_INVALID_HID) {
@@ -476,7 +473,6 @@ void H5_term_library(void) {
 		        if (dataset_copy_check_attr_write_status < 0) {
 		            if (DEBUG)
 						fprintf(log_ptr, "Error writing value to dataset copy check ttribute %ld\n", dataset_copy_check_attr_id);
-		            return -1;
 		        }
 			}
 
