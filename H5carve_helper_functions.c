@@ -663,7 +663,8 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 	filename_copy = malloc(strlen(filename) + 1);
 	strcpy(filename_copy, filename);
 
-	// If original file is a netCDF4 file and tool is being used in re-execution mode, interposed nc_open returns filename with the .carved suffix.
+	// If original file is a netCDF4 file and tool is being used in re-execution mode, interposed nc_open returns filename with the .carved suffix, leading to the carved file name being <filename>.carved.carved.
+	// Removes .carved suffix for netCDF4 files in re-execution mode.
 	if (is_netcdf4 != NULL && use_carved != NULL) {
 		filename_copy[strlen(filename_copy) - 7] = '\0';
 	}
