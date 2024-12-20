@@ -698,7 +698,7 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 	// If a directory for carved files is specified, carved files are created in the specified directory. 
 	if (carved_directory == NULL) {
 	    carved_filename[0] = '\0';
-		strcat(carved_filename, filename);
+		strcat(carved_filename, filename_copy);
 		strcat(carved_filename, ".carved");	
 	} else {
 		carved_filename[0] = '\0';
