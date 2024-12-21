@@ -184,13 +184,13 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 		return H5I_INVALID_HID;
 	}
 
-	herr_t fallback_metadata_ret_val = create_fallback_metadata(filename, destination_group_location_id);
+	// herr_t fallback_metadata_ret_val = create_fallback_metadata(filename, destination_group_location_id);
 
-	if (fallback_metadata_ret_val < 0) {
-		if (DEBUG)
-			fprintf(log_ptr, "Error creating fallback metadata");
-		return fallback_metadata_ret_val;
-	}
+	// if (fallback_metadata_ret_val < 0) {
+	// 	if (DEBUG)
+	// 		fprintf(log_ptr, "Error creating fallback metadata");
+	// 	return fallback_metadata_ret_val;
+	// }
 
     hid_t dataset_copy_check_attr_dataspace_id = H5Screate(H5S_SCALAR);
 
