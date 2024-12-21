@@ -351,45 +351,44 @@ herr_t H5Dread(hid_t dataset_id, hid_t	mem_type_id, hid_t mem_space_id, hid_t fi
 	the original file instead of the carved file.
 */
 hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
-	if (DEBUG)
-		fprintf(log_ptr, "H5Oopen called %ld %s %ld\n", loc_id, name, lapl_id);
+    if (DEBUG)
+        fprintf(log_ptr, "H5Oopen called %ld %s %ld\n", loc_id, name, lapl_id);
 
-	// Original function call
-	original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
-	hid_t return_val;
-	// Fetch USE_CARVED environment variable
-	use_carved = getenv("USE_CARVED");
-	
-	// If in repeat mode and object does not exist in carved file, bifurcate access to original file
-	if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && (!does_dataset_exist(H5Dopen(src_file_id, name, H5P_DEFAULT)))) {
-		// Fetch length of name of dataset
-	    int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
+    // Original function call
+    original_H5Oopen = dlsym(RTLD_NEXT, "H5Oopen");
+    hid_t return_val = original_H5Oopen(loc_id, name, lapl_id);
 
-	    if (size_of_name_buffer == 0) {
-	    	if (DEBUG)
-				fprintf(log_ptr, "Error fetching size of dataset name buffer %ld\n", loc_id);
-	    	return -1;
-	    }
+    if (return_val == H5I_INVALID_HID) {
+        if (DEBUG)
+                fprintf(log_ptr, "Error opening object %ld %s %ld\n", loc_id, name, lapl_id);
+        return return_val;
+    }
 
-	   	// Create and populate buffer for dataset name
-	    char *parent_object_name = (char *)malloc(size_of_name_buffer);
-	    H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
+    // Fetch USE_CARVED environment variable
+    use_carved = getenv("USE_CARVED");
 
-	    hid_t original_file_loc_id = original_H5Oopen(original_file_id, parent_object_name, lapl_id);
-	    free(parent_object_name);
+    // If in repeat mode and object does not exist in carved file, bifurcate access to original file
+    if ((use_carved != NULL && strcmp(use_carved, "true") == 0) && H5Iget_type(return_val) == H5I_DATASET && (!does_dataset_exist(return_val))) {
+        // Fetch length of name of dataset
+        int size_of_name_buffer = H5Iget_name(loc_id, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
-	    return_val = original_H5Oopen(original_file_loc_id, name, lapl_id);
-	} else {
-		return_val = original_H5Oopen(loc_id, name, lapl_id);
+        if (size_of_name_buffer == 0) {
+            if (DEBUG)
+                fprintf(log_ptr, "Error fetching size of dataset name buffer %ld\n", loc_id);
+            return -1;
+        }
 
-		if (return_val == H5I_INVALID_HID) {
-			if (DEBUG)
-				fprintf(log_ptr, "Error opening object %ld %s %ld\n", loc_id, name, lapl_id);
-			return return_val;
-		}
-	}
+        // Create and populate buffer for dataset name
+        char *parent_object_name = (char *)malloc(size_of_name_buffer);
+        H5Iget_name(loc_id, parent_object_name, size_of_name_buffer); // Fill parent_object_name buffer with the dataset name
 
-	return return_val;
+        hid_t original_file_loc_id = original_H5Oopen(original_file_id, parent_object_name, lapl_id);
+        free(parent_object_name);
+
+        return_val = original_H5Oopen(original_file_loc_id, name, lapl_id);
+    }
+
+    return return_val;
 }
 
 void H5_term_library(void) {
