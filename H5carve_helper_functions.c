@@ -665,9 +665,9 @@ char *get_carved_filename(const char *filename, char *is_netcdf4, char *use_carv
 
 	// If original file is a netCDF4 file and tool is being used in re-execution mode, interposed nc_open returns filename with the .carved suffix, leading to the carved file name being <filename>.carved.carved.
 	// Removes .carved suffix for netCDF4 files in re-execution mode.
-	if (is_netcdf4 != NULL && strcmp(is_netcdf4, "true") == 0 && use_carved != NULL && strcmp(use_carved, "true") == 0) {
-		filename_copy[strlen(filename_copy) - 7] = '\0';
-	}
+	if (strlen(filename_copy) >= 7 && strcmp(filename_copy + (strlen(filename_copy) - 7), ".carved") == 0) {
+                filename_copy[strlen(filename_copy) - 7] = '\0';
+        }
 
 	// Traverse the file path to get to the last occurrence of directory separtors to get to name of the file
 	char *filename_without_directories = strrchr(filename_copy, '/');
