@@ -34,8 +34,6 @@ int nc_open(const char *path, int omode, int *ncidp) {
 		if (log_ptr == NULL) {
 			log_ptr = fopen("log", "w");
 		}
-
-		fprintf(log_ptr, "nc_open called %s %d %ls\n", path, omode, ncidp);
 	}
 
 	original_nc_open = dlsym(RTLD_NEXT, "nc_open");
@@ -52,10 +50,19 @@ int nc_open(const char *path, int omode, int *ncidp) {
 
 	// Check if USE_CARVED environment variable has been set
 	if (use_carved != NULL && strcmp(use_carved, "true") == 0) {
+		if (DEBUG) {
+			fprintf(log_ptr, "nc_open called %s %d %ls\n", carved_filename, omode, ncidp);
+		}
+		
 		return original_nc_open(carved_filename, omode, ncidp);
 	}
 
 	free(carved_filename);
+
+	if (DEBUG) {
+		fprintf(log_ptr, "nc_open called %s %d %ls\n", path, omode, ncidp);
+	}
+	
 	return original_nc_open(path, omode, ncidp);
 }
 
