@@ -172,6 +172,24 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 				return NULL;
 			}
 		}
+	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_VLEN) {
+		for (int i = 0; i < num_elements; i++) {
+			size_t size = H5Tget_size(H5Tget_super(data_type));
+			hsize_t num_elements = src_data[i].len;
+
+			// Create carved version of the ith element of the hvl_t struct
+	    	dest_data[i].len = src_data[i].len;
+	    	dest_data[i].p = malloc(size * num_elements);
+	    	
+			dest_data[i].p = copy_vlen_type(src_attribute_id, H5Tget_super(data_type), (hvl_t *)(src_data[i].p), num_elements);
+
+			if (DEBUG)
+    			fprintf(log_ptr, "Copying VLEN element %d len %ld elements\n", i, num_elements);
+			
+			if (dest_data[i].p == NULL) {
+				return NULL;
+			}			
+		}
 	} else {
 		// Process the VLEN data
 	    for (int i = 0; i < num_elements; i++) {
