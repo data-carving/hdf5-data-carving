@@ -36,7 +36,7 @@ hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_
 	    // Create and populate buffer for object name
 	    char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
 	    H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
-	    printf("%s\n", referenced_obj_name);
+
 	    if (DEBUG)
 	        fprintf(log_ptr, "Creating reference to object %s\n", referenced_obj_name);
 
@@ -79,19 +79,41 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 
     		// Check datatype class of each datatype
     		if (H5Tget_class(field_type) == H5T_REFERENCE) {
-    			// TODO add check for REF_OBJ and DSET_REGION
-        		hobj_ref_t *ref_data_dest = copy_reference_object(src_buffer + offset, 1, src_id);
+    			if (H5Tget_size(field_type) == sizeof(hobj_ref_t)) {
+    				if (H5Tequal(H5Tget_super(field_type), H5T_STD_REF_OBJ)) {
+					    // TODO add check for REF_OBJ and DSET_REGION
+		        		hobj_ref_t *ref_data_dest = copy_reference_object(src_buffer + offset, 1, src_id);
 
-        		if (ref_data_dest == NULL) {
-        			return -1;
-        		}
+		        		if (ref_data_dest == NULL) {
+		        			return -1;
+		        		}
 
-        		// Add member to the compound datatype in carved file
-		        H5Tinsert(data_type, field_name, offset, field_type);
+		        		// Add member to the compound datatype in carved file
+				        H5Tinsert(data_type, field_name, offset, field_type);
 
-		        // Copy data to the offset of the member in destination buffer
-				memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
-				free(ref_data_dest);
+				        // Copy data to the offset of the member in destination buffer
+						memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
+						free(ref_data_dest);
+					} else if (H5Tequal(H5Tget_super(field_type), H5T_STD_REF_DSETREG)) {
+						// TODO: Add support for dataset region references
+				    	printf("Dataset region references not supported yet.\n");
+				    	return NULL;
+					}
+    			} else if (H5Tget_size(field_type) == sizeof(H5R_ref_t)){
+					// TODO add check for REF_OBJ and DSET_REGION
+	        		void *ref_data_dest = copy_reference_object_H5R_ref_t(src_id, dest_file_id, field_type, 1, src_buffer + offset);
+
+	        		if (ref_data_dest == NULL) {
+	        			return -1;
+	        		}
+
+	        		// Add member to the compound datatype in carved file
+			        H5Tinsert(data_type, field_name, offset, field_type);
+
+			        // Copy data to the offset of the member in destination buffer
+					memcpy(dest_buffer + offset, ref_data_dest, H5Tget_size(field_type));
+					free(ref_data_dest);
+				}
     		} else if (H5Tget_class(field_type) == H5T_COMPOUND) {
     			// Get number of members for the nested compound datatype member
 				int nested_num_members = H5Tget_nmembers(field_type);
@@ -523,7 +545,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 		void *dest_data = copy_array(src_attribute_id, src_data, attribute_data_type, H5Tcopy(base_type_id), total_elements);
 		
 		herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, dest_data);
-
+		
 		if (write_status < 0) {
 	        if (DEBUG)
     			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
@@ -621,7 +643,15 @@ void *copy_array(hid_t src_attribute_id, void *src_data, hid_t attribute_data_ty
 
 		return dest_data;
 	} else if (H5Tget_class(base_type_id) == H5T_COMPOUND) {
-		printf("COMPOUND\n");
+		// Get number of members in the compound datatype
+    	int num_members = H5Tget_nmembers(base_type_id);
+
+    	void *dest_data = malloc(H5Tget_size(base_type_id) * total_elements);
+
+        herr_t copy_compound_type_return_value = copy_compound_type(src_attribute_id, src_data, dest_data, base_type_id, total_elements, num_members, 0);
+
+		return dest_data;
+		// return NULL;
 	} else {
 		void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
 
