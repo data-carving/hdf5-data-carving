@@ -7,6 +7,9 @@
 #include <string.h>
 #include <dlfcn.h>
 
+extern H5R_ref_t created_reference_objects[2048];
+extern current_index;
+
 hobj_ref_t *copy_reference_object(hobj_ref_t *source_ref, int num_elements, hid_t src_attribute_id) {
 	hobj_ref_t *dest_ref = malloc(num_elements * sizeof(hobj_ref_t));
 
@@ -146,6 +149,16 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 			// TODO: Add support for dataset region references
         	printf("Dataset region references not supported yet.\n");
         	return NULL;
+		} else {
+			// Process the VLEN data
+		    for (int i = 0; i < num_elements; i++) {
+		    	if (DEBUG)
+    				fprintf(log_ptr, "Copying REFERENCE element %d len %ld\n", i, dest_data[i].len);
+
+    			// Create carved version of the ith element of the hvl_t struct
+			    dest_data[i].len = src_data[i].len;
+			 	dest_data[i].p = copy_reference_object_H5R_ref_t(src_attribute_id, dest_file_id, data_type, src_data[i].len, src_data[i].p);
+		    }
 		}
 	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_COMPOUND) {
 		for (int i = 0; i < num_elements; i++) {
@@ -489,70 +502,39 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	    free(src_data);
     } else if (H5Tget_class(attribute_data_type) == H5T_ARRAY) {
         // Compute the total number of elements in the array
-    	hid_t base_type_id = -1;
-    	hid_t array_dtype_copy;
-    	hsize_t total_elements = get_total_num_elems_and_base_type(attribute_data_type, &base_type_id, &array_dtype_copy);
+    	hid_t base_type_id;
+    	hid_t array_dtype_copy = H5Tcopy(attribute_data_type);
+    	hsize_t total_elements = get_total_num_elems_and_base_type(attribute_data_type, &base_type_id);
 
     	// If attribute already exists, open the existing attribute. Otherwise, create the attribute.
 		if (H5Aexists(dest_object_id, name_of_attribute)) {
 			dest_attribute_id = H5Aopen(dest_object_id, name_of_attribute, H5P_DEFAULT);
 		} else {
+			// dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, array_dtype_copy, H5Screate(H5S_SCALAR), H5P_DEFAULT, H5P_DEFAULT);
 			dest_attribute_id = H5Acreate(dest_object_id, name_of_attribute, array_dtype_copy, H5Screate(H5S_SCALAR), H5P_DEFAULT, H5P_DEFAULT);
-			printf("dest_attribute_id %d\n", dest_attribute_id);
 		}
 
-		if (H5Tget_class(base_type_id) == H5T_REFERENCE) {
-			if (H5Tequal(base_type_id, H5T_STD_REF_OBJ) > 0) {
-            	hobj_ref_t *src_data = malloc(total_elements * H5Tget_size(base_type_id));
+		// void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
+		// void *src_data = malloc(H5Aget_storage_size(src_attribute_id));
+		void *src_data = malloc(H5Tget_size(attribute_data_type));
 
-				H5Aread(src_attribute_id, attribute_data_type, src_data);
+		H5Aread(src_attribute_id, attribute_data_type, src_data);
 
-				hobj_ref_t *ref_data_dest = copy_reference_object(src_data, total_elements, src_attribute_id);
+		void *dest_data = copy_array(src_attribute_id, src_data, attribute_data_type, H5Tcopy(base_type_id), total_elements);
+		
+		herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, dest_data);
 
-	        	herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, ref_data_dest);
+		if (write_status < 0) {
+	        if (DEBUG)
+    			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
+	        return write_status;
+	    }
 
-				if (write_status < 0) {
-					printf("FAIL\n");
-			        if (DEBUG)
-		    			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
-			        return write_status;
-			    }
-	        }
-	        else if (H5Tequal(base_type_id, H5T_STD_REF_DSETREG) > 0) {
-	            printf("The datatype is H5T_STD_REF_DSETREG (dataset region reference).\n");
-	        }
-	        else {
-				H5R_ref_t *src_data = (H5R_ref_t *)malloc(total_elements * sizeof(H5R_ref_t));
-
-				H5Aread(src_attribute_id, attribute_data_type, src_data);
-
-				H5R_ref_t *dest_data = copy_reference_object_H5R_ref_t(src_attribute_id, dest_file_id, attribute_data_type, total_elements, src_data);
-
-				herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, dest_data);
-
-				if (write_status < 0) {
-			        if (DEBUG)
-		    			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
-			        return write_status;
-			    }
-
-			    for (int i = 0; i < total_elements; i++) {
-					H5Rdestroy(&dest_data[i]);
-				}
-	        }
-		} else {
-			void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
-
-			H5Aread(src_attribute_id, attribute_data_type, src_data);
-
-			herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, src_data);
-
-			if (write_status < 0) {
-		        if (DEBUG)
-	    			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
-		        return write_status;
-		    }			
+	    for (int i = 0; i < current_index; i++) {
+			H5Rdestroy(&created_reference_objects[i]);
 		}
+
+		current_index = 0;
     } else {
     	if (DEBUG)
     		fprintf(log_ptr, "Copying OTHER attribute %s\n", name_of_attribute);
@@ -607,9 +589,47 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	return 0;
 }
 
-#include "hdf5.h"
-#include <stdio.h>
-#include <stdlib.h>
+void *copy_array(hid_t src_attribute_id, void *src_data, hid_t attribute_data_type, hid_t base_type_id, int total_elements) {
+	if (H5Tget_class(base_type_id) == H5T_REFERENCE) {
+		if (H5Tequal(base_type_id, H5T_STD_REF_OBJ) > 0) {
+	    	void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
+
+			H5Aread(src_attribute_id, attribute_data_type, src_data);
+
+			void *dest_data = copy_reference_object(src_data, total_elements, src_attribute_id);
+
+	    	return dest_data;
+	    }
+	    else if (H5Tequal(base_type_id, H5T_STD_REF_DSETREG) > 0) {
+	        printf("The datatype is H5T_STD_REF_DSETREG (dataset region reference).\n");
+	    }
+	    else {
+			void *src_data = malloc(total_elements * sizeof(H5R_ref_t));
+
+			H5Aread(src_attribute_id, attribute_data_type, src_data);
+
+			void *dest_data = copy_reference_object_H5R_ref_t(src_attribute_id, dest_file_id, attribute_data_type, total_elements, src_data);
+
+			return dest_data;
+	    }
+	} else if (H5Tget_class(base_type_id) == H5T_VLEN) {
+		void *dest_data = copy_vlen_type(src_attribute_id, base_type_id, src_data, total_elements);
+
+		if (dest_data == NULL) {
+			return -1;
+		}
+
+		return dest_data;
+	} else if (H5Tget_class(base_type_id) == H5T_COMPOUND) {
+		printf("COMPOUND\n");
+	} else {
+		void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
+
+		H5Aread(src_attribute_id, attribute_data_type, src_data);
+
+		return src_data;		
+	}
+}
 
 /* 
  * This function reads references from src_attribute_id into an
@@ -620,6 +640,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 H5R_ref_t* copy_reference_object_H5R_ref_t(hid_t src_attribute_id, hid_t dest_file_id, hid_t attribute_data_type, size_t total_elements, H5R_ref_t *src_data) {
     // Allocate array for the destination references (what we'll return)
     H5R_ref_t *dest_data = (H5R_ref_t *)malloc(total_elements * sizeof(H5R_ref_t));
+
     if (!dest_data) {
         fprintf(stderr, "Failed to allocate memory for dest_data.\n");
         free(src_data);
@@ -678,6 +699,9 @@ H5R_ref_t* copy_reference_object_H5R_ref_t(hid_t src_attribute_id, hid_t dest_fi
             return NULL;
         }
 
+        created_reference_objects[current_index] = dest_data[i];
+        current_index++;
+
         // Close & cleanup
         H5Oclose(referenced_obj);
         free(referenced_obj_name);
@@ -688,7 +712,7 @@ H5R_ref_t* copy_reference_object_H5R_ref_t(hid_t src_attribute_id, hid_t dest_fi
 }
 
 
-hsize_t get_total_num_elems_and_base_type(hid_t type_id, hid_t *base_type_id, hid_t *recursive_copy_type_id) {
+hsize_t get_total_num_elems_and_base_type(hid_t type_id, hid_t *base_type_id) {
     if (H5Tget_class(type_id) == H5T_ARRAY) {
         int ndims = H5Tget_array_ndims(type_id);
         hsize_t dims[H5S_MAX_RANK];
@@ -698,9 +722,10 @@ hsize_t get_total_num_elems_and_base_type(hid_t type_id, hid_t *base_type_id, hi
         hid_t super_type_id = H5Tget_super(type_id);
 
         // Get total elements in the nested array
-        hsize_t nested_count = get_total_num_elems_and_base_type(super_type_id, base_type_id, recursive_copy_type_id);
+        // hsize_t nested_count = get_total_num_elems_and_base_type(super_type_id, base_type_id, recursive_copy_type_id);
+        hsize_t nested_count = get_total_num_elems_and_base_type(super_type_id, base_type_id);
 
-        *recursive_copy_type_id = H5Tarray_create2(*recursive_copy_type_id, ndims, dims);
+        // *recursive_copy_type_id = H5Tarray_create2(*recursive_copy_type_id, ndims, dims);
 
         // printf("recursive case recursive_copy_type_id %d\n", *recursive_copy_type_id);
         // Multiply by the dimension size of this level
@@ -715,59 +740,59 @@ hsize_t get_total_num_elems_and_base_type(hid_t type_id, hid_t *base_type_id, hi
         // Base case: we have an atomic type (float, int, reference etc.)
         // Return 1 from here, and provide type_id as the base.
         *base_type_id = type_id;
-        *recursive_copy_type_id = H5Tcopy(type_id);
+        // *recursive_copy_type_id = H5Tcopy(type_id);
         // printf("base case recursive_copy_type_id %d\n", *recursive_copy_type_id);
         return 1;
     }
 }
 
-void create_array_of_references(hid_t src_attribute_id, hid_t dest_attribute_id, hid_t array_dtype_copy, H5R_ref_t *src_data, H5R_ref_t *head_dest_data, H5R_ref_t *current_dest_data, int total_elements) {
-	// Iterate over all elements in the reference attribute
-	for (int i = 0; i < total_elements; i++) {
-		// Process the reference data
-	    hid_t referenced_obj = H5Rdereference1(src_attribute_id, H5R_OBJECT, (src_data + i)); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
+// void create_array_of_references(hid_t src_attribute_id, hid_t dest_attribute_id, hid_t array_dtype_copy, H5R_ref_t *src_data, H5R_ref_t *head_dest_data, H5R_ref_t *current_dest_data, int total_elements) {
+// 	// Iterate over all elements in the reference attribute
+// 	for (int i = 0; i < total_elements; i++) {
+// 		// Process the reference data
+// 	    hid_t referenced_obj = H5Rdereference1(src_attribute_id, H5R_OBJECT, (src_data + i)); // Should this be replaced by H5Rdereference? Attempting to replace it leads to errors
 
-	    if (referenced_obj < 0) {
-	    	// if (DEBUG)
-	        	// fprintf(log_ptr, "Error dereferencing object %ld\n", src_attribute_id);
-	        // return NULL;
-	    }
+// 	    if (referenced_obj < 0) {
+// 	    	// if (DEBUG)
+// 	        	// fprintf(log_ptr, "Error dereferencing object %ld\n", src_attribute_id);
+// 	        // return NULL;
+// 	    }
 
-	    // Fetch length of name of referenced object
-	    int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
+// 	    // Fetch length of name of referenced object
+// 	    int size_of_name_buffer = H5Iget_name(referenced_obj, NULL, 0) + 1; // Preliminary call to fetch length of dataset name
 
-	    if (size_of_name_buffer == 0) {
-	        // if (DEBUG)
-	        	// fprintf(log_ptr, "Error fetching size of dataset name buffer %ld\n", referenced_obj);
-	        // return NULL;
-	    }
+// 	    if (size_of_name_buffer == 0) {
+// 	        // if (DEBUG)
+// 	        	// fprintf(log_ptr, "Error fetching size of dataset name buffer %ld\n", referenced_obj);
+// 	        // return NULL;
+// 	    }
 
-	    // Create and populate buffer for object name
-	    char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
-	    H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
-	    printf("%s\n", referenced_obj_name);
-	    // if (DEBUG)
-	        // fprintf(log_ptr, "Creating reference to object %s\n", referenced_obj_name);
+// 	    // Create and populate buffer for object name
+// 	    char *referenced_obj_name = (char *)malloc(size_of_name_buffer);
+// 	    H5Iget_name(referenced_obj, referenced_obj_name, size_of_name_buffer); // Fill referenced_obj_name buffer with the dataset name
+// 	    printf("%s\n", referenced_obj_name);
+// 	    // if (DEBUG)
+// 	        // fprintf(log_ptr, "Creating reference to object %s\n", referenced_obj_name);
 
-	   	H5Rcreate_object(dest_file_id, referenced_obj_name, H5P_DEFAULT, current_dest_data + i);
+// 	   	H5Rcreate_object(dest_file_id, referenced_obj_name, H5P_DEFAULT, current_dest_data + i);
 
-		H5Oclose(referenced_obj);		
-	    free(referenced_obj_name);
-	}
+// 		H5Oclose(referenced_obj);		
+// 	    free(referenced_obj_name);
+// 	}
 
-	herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, head_dest_data);
+// 	herr_t write_status = H5Awrite(dest_attribute_id, array_dtype_copy, head_dest_data);
 
-	if (write_status < 0) {
-		printf("FAIL\n");
-        if (DEBUG)
-			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
-        return write_status;
-    }
+// 	if (write_status < 0) {
+// 		printf("FAIL\n");
+//         if (DEBUG)
+// 			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, array_dtype_copy);
+//         return write_status;
+//     }
 
-    for (int i = 0; i < total_elements; i++) {
-    	H5Rdestroy(current_dest_data + i);
-    }
-}
+//     for (int i = 0; i < total_elements; i++) {
+//     	H5Rdestroy(current_dest_data + i);
+//     }
+// }
 
 herr_t delete_attributes(hid_t loc_id, const char *name, const H5A_info_t *ainfo, void *opdata) {
 	herr_t status = H5Adelete(loc_id, name);

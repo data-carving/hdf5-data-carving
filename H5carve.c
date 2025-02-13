@@ -26,6 +26,8 @@ char **files_opened;
 int files_opened_current_size;
 FILE *log_ptr;
 char *DEBUG;
+H5R_ref_t created_reference_objects[2048];
+int current_index;
 
 int nc_open(const char *path, int omode, int *ncidp) {
 	DEBUG = getenv("DEBUG");
@@ -392,6 +394,8 @@ hid_t H5Oopen(hid_t loc_id, const char *name, hid_t lapl_id) {
 }
 
 void H5_term_library(void) {
+	// current_index = 0;
+
 	if (DEBUG)
 		fprintf(log_ptr, "H5_term_library called\n");
 
