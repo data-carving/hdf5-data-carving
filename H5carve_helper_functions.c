@@ -134,6 +134,15 @@ herr_t copy_compound_type(hid_t src_id, void *src_buffer, void *dest_buffer, hid
 				// Copy data to the offset of the member in destination buffer
 				memcpy(dest_buffer + offset, dest_data, H5Tget_size(field_type));
 				free(dest_data);
+    		} else if (H5Tget_class(field_type) == H5T_ARRAY) {
+    			hid_t base_type_id;
+		    	hsize_t total_elements = get_total_num_elems_and_base_type(field_type, &base_type_id);
+
+		    	void *dest_data = copy_array(src_id, src_buffer + offset, field_type, base_type_id, total_elements);
+	    		
+				// Copy data to the offset of the member in destination buffer
+				memcpy(dest_buffer + offset, dest_data, H5Tget_size(field_type));
+				free(dest_data);
     		} else {
     			H5Tinsert(data_type, field_name, offset, field_type);
 
