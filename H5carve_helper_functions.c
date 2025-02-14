@@ -225,6 +225,16 @@ hvl_t *copy_vlen_type(hid_t src_attribute_id, hid_t data_type, hvl_t *src_data, 
 				return NULL;
 			}			
 		}
+	} else if (H5Tget_class(H5Tget_super(data_type)) == H5T_ARRAY) {
+		for (int i = 0; i < num_elements; i++) {
+			// Compute the total number of elements in the array
+	    	hid_t base_type_id;
+	    	hid_t super_data_type = H5Tget_super(data_type);
+	    	hsize_t total_elements = get_total_num_elems_and_base_type(super_data_type, &base_type_id);
+
+	    	dest_data[i].len = src_data[i].len;
+			dest_data[i].p = copy_array(src_attribute_id, src_data[i].p, super_data_type, H5Tcopy(base_type_id), total_elements * src_data[i].len);
+		}
 	} else {
 		// Process the VLEN data
 	    for (int i = 0; i < num_elements; i++) {
@@ -508,11 +518,17 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 
 	    herr_t write_status = H5Awrite(dest_attribute_id, attribute_data_type, dest_data);
 	    
-	    if (write_status < 0) {	
+	    if (write_status < 0) {
 	        if (DEBUG)
     			fprintf(log_ptr, "Error writing attribute %ld %ld\n", dest_attribute_id, attribute_data_type);
 	        return write_status;
 	    }
+
+	    for (int i = 0; i < current_index; i++) {
+			H5Rdestroy(&created_reference_objects[i]);
+		}
+
+		current_index = 0;
 
 	    if ((H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_COMPOUND) || (H5Tget_class(H5Tget_super(attribute_data_type)) == H5T_REFERENCE)) {
 	    	for (int i = 0; i < dims[0]; i++) {
@@ -614,9 +630,9 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 void *copy_array(hid_t src_attribute_id, void *src_data, hid_t attribute_data_type, hid_t base_type_id, int total_elements) {
 	if (H5Tget_class(base_type_id) == H5T_REFERENCE) {
 		if (H5Tequal(base_type_id, H5T_STD_REF_OBJ) > 0) {
-	    	void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
+	    	// void *src_data = malloc(total_elements * H5Tget_size(base_type_id));
 
-			H5Aread(src_attribute_id, attribute_data_type, src_data);
+			// H5Aread(src_attribute_id, attribute_data_type, src_data);
 
 			void *dest_data = copy_reference_object(src_data, total_elements, src_attribute_id);
 
@@ -626,9 +642,9 @@ void *copy_array(hid_t src_attribute_id, void *src_data, hid_t attribute_data_ty
 	        printf("The datatype is H5T_STD_REF_DSETREG (dataset region reference).\n");
 	    }
 	    else {
-			void *src_data = malloc(total_elements * sizeof(H5R_ref_t));
+			// void *src_data = malloc(total_elements * sizeof(H5R_ref_t));
 
-			H5Aread(src_attribute_id, attribute_data_type, src_data);
+			// H5Aread(src_attribute_id, attribute_data_type, src_data);
 
 			void *dest_data = copy_reference_object_H5R_ref_t(src_attribute_id, dest_file_id, attribute_data_type, total_elements, src_data);
 
