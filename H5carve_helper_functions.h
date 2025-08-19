@@ -1,7 +1,7 @@
 /*
  * HDF5 Data Carving
  *
- * Copyright (c) 2011-2012, SRI International
+ * Copyright (c) 2024-2025, SRI International
  *
  *  All rights reserved.
  *
