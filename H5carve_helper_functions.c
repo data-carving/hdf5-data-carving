@@ -374,6 +374,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	hid_t dest_object_id = *(hid_t *)opdata;
 
 	if (dest_object_id < 0) {
+
 		return -1;
 	}
 
@@ -383,6 +384,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	if (src_attribute_id < 0) {
 		if (DEBUG)
     		fprintf(log_ptr, "Error opening attribute %ld %s\n", loc_id, name);
+
 		return src_attribute_id ;
 	}
 
@@ -392,6 +394,7 @@ int copy_object_attributes(hid_t loc_id, const char *name, const H5A_info_t *lin
 	if (size_of_name_buffer < 0) {
 		if (DEBUG)
     		fprintf(log_ptr, "Error fetching attribute name %ld\n", src_attribute_id);
+
 		return size_of_name_buffer;
 	}
 
@@ -905,6 +908,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	if (object_id < 0) {
 		if (DEBUG)
     		fprintf(log_ptr, "Error opening object %ld %s\n", loc_id, name);
+    
 		return object_id;
 	}
 
@@ -914,6 +918,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	if (dest_parent_object_id == NULL) {
 		if (DEBUG)
     		fprintf(log_ptr, "Error due to NULL destination file parent object\n");
+
 		return -1;
 	}
 
@@ -923,6 +928,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	if (object_type == H5I_BADID) {
 		if (DEBUG)
     		fprintf(log_ptr, "Error fetching type of identifier %ld\n", object_id);
+
 		return object_type;
 	}
 
@@ -949,6 +955,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		if (dataset_id == H5I_INVALID_HID) {
 			if (DEBUG)
     			fprintf(log_ptr, "Error opening dataset %ld %s\n", src_file_id, object_name);
+
 			return dataset_id;
 		}
 
@@ -958,6 +965,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		if (data_type == H5I_INVALID_HID) {
 			if (DEBUG)
     			fprintf(log_ptr, "Error fetching type of dataset %ld\n", dataset_id);
+
 			return data_type;
 		}
 
@@ -990,6 +998,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 	    H5Awrite(attr_id, H5T_NATIVE_HBOOL, &is_empty);
 
 	    free(object_name);
+
 	// If object is a group, make shallow copy of the group and recursively go down the tree
 	} else if (object_type == H5I_GROUP) {
 		// Create group in destination file
@@ -998,6 +1007,7 @@ herr_t shallow_copy_object(hid_t loc_id, const char *name, const H5L_info_t *lin
 		if (dest_group_id < 0) {
 			if (DEBUG)
     			fprintf(log_ptr, "Error creating shallow copy of group %s. dest_parent_object_id is %ld\n", name, *dest_parent_object_id);
+
 			return dest_group_id;
 		}
 

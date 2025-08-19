@@ -122,7 +122,9 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 
 	// Create name of carved file
 	char *carved_directory = getenv("CARVED_DIRECTORY");
+
 	is_netcdf4 = getenv("NETCDF4");
+  
 	// Fetch USE_CARVED environment variable
 	use_carved = getenv("USE_CARVED");
 
@@ -198,6 +200,7 @@ hid_t H5Fopen (const char *filename, unsigned flags, hid_t fapl_id) {
 	if (group_location_id == H5I_INVALID_HID) {
 		if (DEBUG)
 			fprintf(log_ptr, "Error opening source file root group %ld\n", src_file_id);
+
 		return H5I_INVALID_HID;
 	}
 
